@@ -13,6 +13,12 @@ from typing import Any
 _LOCK = threading.RLock()
 
 
+def _umask() -> int:
+    cur = os.umask(0)
+    os.umask(cur)
+    return cur
+
+
 def now_iso() -> str:
     return _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()
 
@@ -36,6 +42,7 @@ def atomic_write_text(path: Path, text: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
+        os.chmod(tmp, 0o666 & ~_umask())  # mkstemp creates 0600; published files must be world-readable
         os.replace(tmp, path)
     finally:
         if os.path.exists(tmp):

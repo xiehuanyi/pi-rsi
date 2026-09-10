@@ -7,9 +7,10 @@ from typing import Any
 
 from .config import ExperimentCfg
 from .tree import Tree, Node
-from .util import atomic_write_text, read_text, tail_text, fmt_score, human_duration, now_iso
+from .util import atomic_write_text, read_text, tail_text, fmt_score, human_duration, now_iso, read_json
 
 _TEMPLATE = Path(__file__).parent / "templates" / "tree.html"
+_TREE_JS = Path(__file__).parent / "templates" / "tree.js"
 
 
 def layout(tree: Tree) -> dict[str, tuple[float, float]]:
@@ -82,11 +83,30 @@ def build_data(cfg: ExperimentCfg, tree: Tree, costs: dict, state: dict) -> dict
     }
 
 
-def render_html(data: dict[str, Any]) -> str:
+def _payload(data: dict[str, Any]) -> str:
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+
+
+def render_html(data: dict[str, Any], external: bool = False, title: str | None = None, back_link: str = "") -> str:
+    """Self-contained page by default; with external=True the page references data.js and tree.js next to it
+    (needed where a Content-Security-Policy forbids inline scripts, e.g. the blog)."""
     tpl = _TEMPLATE.read_text(encoding="utf-8")
-    payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
-    title = f"{data['experiment']} · {data['task']} search tree"
-    return tpl.replace("__TITLE__", title.replace("<", "&lt;")).replace("__DATA__", payload)
+    title = title or f"{data['experiment']} · {data['task']} search tree"
+    if external:
+        scripts = '<script src="data.js"></script>\n<script src="tree.js"></script>'
+    else:
+        scripts = f"<script>window.__RSI_DATA__ = {_payload(data)};</script>\n<script>\n{_TREE_JS.read_text(encoding='utf-8')}\n</script>"
+    back = f'<div class="sub" style="margin-bottom:6px"><a href="{back_link}">← RSI notes</a></div>' if back_link else ""
+    return tpl.replace("__TITLE__", title.replace("<", "&lt;")).replace("__SCRIPTS__", scripts).replace("__BACK__", back)
+
+
+def render_bundle(cfg: ExperimentCfg, tree: Tree, out_dir: Path, title: str | None = None, back_link: str = "") -> None:
+    """Write index.html + data.js + tree.js (CSP-safe, no inline scripts) for static hosting."""
+    data = build_data(cfg, tree, read_json(cfg.dir / "costs.json", {}) or {}, read_json(cfg.dir / "state.json", {}) or {})
+    out_dir.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(out_dir / "index.html", render_html(data, external=True, title=title, back_link=back_link))
+    atomic_write_text(out_dir / "data.js", "window.__RSI_DATA__ = " + _payload(data) + ";\n")
+    atomic_write_text(out_dir / "tree.js", _TREE_JS.read_text(encoding="utf-8"))
 
 
 def render_md(cfg: ExperimentCfg, tree: Tree, data: dict[str, Any]) -> str:
