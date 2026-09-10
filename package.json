@@ -1,0 +1,12 @@
+{
+  "name": "pi-rsi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Auto-research harness on top of the pi coding agent (pinned).",
+  "scripts": {
+    "pi": "pi"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1"
+  }
+}

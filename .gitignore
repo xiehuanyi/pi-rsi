@@ -1,0 +1,8 @@
+node_modules/
+experiments/
+__pycache__/
+*.pyc
+.venv/
+tasks/*/.venv/
+*.egg-info/
+.pytest_cache/

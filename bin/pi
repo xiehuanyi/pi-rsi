@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Pinned pi (see package.json). No update checks, no telemetry.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0
+exec "$HERE/node_modules/.bin/pi" "$@"

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pi-rsi"
+version = "0.1.0"
+description = "pi-rsi: an auto-research harness (tree search + handoffs + watchdog) around headless coding agents (pi, grok)."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+rsi = "pi_rsi.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pi_rsi*"]
+
+[tool.setuptools.package-data]
+pi_rsi = ["prompts/*.md", "templates/*.html"]

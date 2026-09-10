@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Entry point: ./rsi <command> ... (no install needed)
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m pi_rsi.cli "$@"
