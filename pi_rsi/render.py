@@ -85,7 +85,8 @@ def build_data(cfg: ExperimentCfg, tree: Tree, costs: dict, state: dict) -> dict
 def render_html(data: dict[str, Any]) -> str:
     tpl = _TEMPLATE.read_text(encoding="utf-8")
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
-    return tpl.replace("__DATA__", payload)
+    title = f"{data['experiment']} · {data['task']} search tree"
+    return tpl.replace("__TITLE__", title.replace("<", "&lt;")).replace("__DATA__", payload)
 
 
 def render_md(cfg: ExperimentCfg, tree: Tree, data: dict[str, Any]) -> str:

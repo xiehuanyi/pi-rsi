@@ -3,13 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pi-rsi tree</title>
+<title>__TITLE__</title>
 <style>
 :root{--bg:#f7f7f5;--fg:#1c1c1c;--muted:#6b6b6b;--panel:#ffffff;--line:#d9d9d4;--accent:#2f6fde;--ok:#2e9e5b;--warn:#d98a1f;--bad:#d64545;--gold:#c9a227;--run:#2f6fde;--plan:#9a9a9a;--code:#f0f0ec}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}}
 :root[data-theme="dark"]{--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-inline:16px;padding-block:12px}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-inline:16px;padding-block:12px;font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 h1{font-size:18px;margin:0 0 4px}
 .sub{color:var(--muted);font-size:13px}
 .kpis{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}

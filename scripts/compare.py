@@ -73,19 +73,61 @@ def main() -> int:
 
 
 def _html(data: list[dict], md: str) -> str:
-    payload = json.dumps([{k: v for k, v in d.items() if k != "nodes"} for d in data]).replace("<", "\\u003c")
-    return f"""<!doctype html><html><head><meta charset="utf-8"><title>pi-rsi comparison</title>
-<style>body{{font:14px system-ui;margin:0;padding:16px;background:#f7f7f5;color:#1c1c1c}}pre{{background:#fff;border:1px solid #ddd;padding:10px;white-space:pre-wrap}}
-svg text{{font:12px system-ui}}</style></head><body><h2>pi-rsi comparison</h2><svg id="c" width="900" height="320"></svg><pre>{md.replace('<','&lt;')}</pre>
-<script>const D={payload};const svg=document.getElementById('c');const W=900,H=320,m={{l:70,r:20,t:20,b:40}};
-const cols=['#2f6fde','#d98a1f','#2e9e5b','#d64545'];let all=[];D.forEach(d=>{{all.push(d.root);d.curve.forEach(c=>{{if(c.score!=null)all.push(c.score)}});Object.values(d.reference||{{}}).forEach(v=>all.push(v))}});
-let lo=Math.min(...all),hi=Math.max(...all);if(hi===lo)hi=lo+1;const pad=(hi-lo)*.08;lo-=pad;hi+=pad;const N=Math.max(...D.map(d=>d.curve.length),1);
+    """Self-contained comparison page (same visual system as tree.html): KPI tiles per run, best-so-far curves,
+    node sequences side by side."""
+    payload = json.dumps([{k: v for k, v in d.items() if k != "nodes"} for d in data], ensure_ascii=False).replace("<", "\\u003c")
+    names = " vs ".join(d["name"] for d in data)
+    return """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__NAMES__</title>
+<style>
+:root{--bg:#f7f7f5;--fg:#1c1c1c;--muted:#6b6b6b;--panel:#ffffff;--line:#d9d9d4;--accent:#2f6fde;--ok:#2e9e5b;--warn:#d98a1f;--bad:#d64545;--gold:#c9a227;--code:#f0f0ec;--s0:#2f6fde;--s1:#d98a1f;--s2:#2e9e5b;--s3:#8a4fd6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}}
+:root[data-theme="dark"]{--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-inline:16px;padding-block:14px;font-variant-numeric:tabular-nums}
+h1{font-size:19px;margin:0 0 2px;text-wrap:balance}.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.runs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.run{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;border-top:4px solid var(--c)}
+.run h2{font-size:15px;margin:0 0 2px}.run .m{color:var(--muted);font-size:12px;margin-bottom:8px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.kpi .v{font-size:17px;font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px;min-width:0}
+.panel h3{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+svg text{font:12px system-ui,sans-serif;fill:var(--fg)}
+.seq{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+ol{margin:0;padding-left:20px}li{margin:3px 0}
+.tag{display:inline-block;min-width:64px;text-align:right;font-weight:600}
+.up{color:var(--ok)}.down{color:var(--warn)}.fail{color:var(--bad)}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}th{color:var(--muted)}
+</style></head><body>
+<h1 id="h"></h1><div class="sub" id="sub"></div>
+<div class="runs" id="runs"></div>
+<div class="panel"><h3>Best so far by finished node</h3><svg id="c" width="100%" height="300"></svg></div>
+<div class="panel"><h3>Node sequences (finish order)</h3><div class="seq" id="seq"></div></div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('data').textContent);const cols=['var(--s0)','var(--s1)','var(--s2)','var(--s3)'];
+const fmt=x=>(x==null)?'-':Math.round(x).toLocaleString();const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const dur=s=>s==null?'-':(s<3600?Math.round(s/60)+'m':Math.floor(s/3600)+'h'+String(Math.round((s%3600)/60)).padStart(2,'0'));
+document.getElementById('h').textContent='pi-rsi · '+D.map(d=>d.name).join(' vs ');
+document.getElementById('sub').textContent='Same task pack, seeds, budget and utility model; only the worker model differs. Official score = mean final money on the validation seeds; held-out = test seeds never seen during the search.';
+document.getElementById('runs').innerHTML=D.map((d,j)=>{const f=d.final||{};const k=[['baseline',fmt(d.root)],['best (validation)',fmt(d.best)+' · '+(d.best_id||'')],['held-out test',fmt(f.best_final_score)],['nodes done / failed',d.n_done+' / '+d.n_failed],['stop',f.stop_reason||d.state.status||'-'],['wall-clock',dur(d.elapsed)],['worker time',dur(d.worker_seconds)],['tokens in / out',(d.tokens_in/1e6).toFixed(2)+'M / '+(d.tokens_out/1e3).toFixed(0)+'k'],['est. API cost','$'+d.cost.toFixed(2)]];
+return `<div class="run" style="--c:${cols[j%4]}"><h2>${esc(d.name)}</h2><div class="m">worker ${esc(d.runner)}</div><div class="kpis">${k.map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${esc(v)}</div></div>`).join('')}</div></div>`}).join('');
+(function(){const c=document.getElementById('c');const W=c.clientWidth||900,H=300,m={l:64,r:20,t:16,b:44};c.setAttribute('viewBox',`0 0 ${W} ${H}`);
+let all=[];D.forEach(d=>{all.push(d.root);d.curve.forEach(x=>{if(x.score!=null)all.push(x.score)})});const refs=Object.assign({},...D.map(d=>d.reference||{}));
+let lo=Math.min(...all),hi=Math.max(...all);if(hi===lo)hi=lo+1;const pad=(hi-lo)*.1;lo-=pad;hi+=pad;const N=Math.max(...D.map(d=>d.curve.length),1);
 const X=i=>m.l+i/N*(W-m.l-m.r),Y=v=>m.t+(1-(v-lo)/(hi-lo))*(H-m.t-m.b);let s='';
-for(let k=0;k<5;k++){{const v=lo+(hi-lo)*k/4;s+=`<line x1="${{m.l}}" x2="${{W-m.r}}" y1="${{Y(v)}}" y2="${{Y(v)}}" stroke="#ddd"/><text x="${{m.l-6}}" y="${{Y(v)+4}}" text-anchor="end">${{Math.round(v).toLocaleString()}}</text>`}}
-D.forEach((d,j)=>{{const pts=[[X(0),Y(d.root)]];d.curve.forEach((c,i)=>{{pts.push([X(i+1),Y(c.best)])}});s+=`<polyline fill="none" stroke="${{cols[j%4]}}" stroke-width="2" points="${{pts.map(p=>p.join(',')).join(' ')}}"/>`;
-d.curve.forEach((c,i)=>{{if(c.score!=null)s+=`<circle cx="${{X(i+1)}}" cy="${{Y(c.score)}}" r="4" fill="${{c.status==='done'?cols[j%4]:'#d64545'}}"><title>${{d.name}} ${{c.id}} ${{Math.round(c.score)}} ${{c.title}}</title></circle>`;else s+=`<text x="${{X(i+1)}}" y="${{H-m.b+14}}" fill="#d64545" text-anchor="middle">✕</text>`}});
-s+=`<text x="${{m.l+10}}" y="${{m.t+14+16*j}}" fill="${{cols[j%4]}}" font-weight="600">${{d.name}} (${{d.runner}})</text>`}});
-s+=`<text x="${{W/2}}" y="${{H-6}}" text-anchor="middle">finished nodes (in order); line = best so far, dots = node score</text>`;svg.innerHTML=s;</script></body></html>"""
+for(let k=0;k<5;k++){const v=lo+(hi-lo)*k/4;s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end" style="fill:var(--muted);font-size:11px">${fmt(v)}</text>`}
+s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(D[0].root)}" y2="${Y(D[0].root)}" stroke="var(--gold)" stroke-dasharray="4,4"/><text x="${W-m.r}" y="${Y(D[0].root)-4}" text-anchor="end" style="fill:var(--gold);font-size:11px">baseline ${fmt(D[0].root)}</text>`;
+D.forEach((d,j)=>{const pts=[[X(0),Y(d.root)]];d.curve.forEach((x,i)=>pts.push([X(i+1),Y(x.best)]));s+=`<polyline fill="none" stroke="${cols[j%4]}" stroke-width="2.5" points="${pts.map(p=>p.join(',')).join(' ')}"/>`;
+d.curve.forEach((x,i)=>{if(x.score!=null)s+=`<circle cx="${X(i+1)}" cy="${Y(x.score)}" r="4.5" fill="${x.status==='done'?cols[j%4]:'var(--bad)'}" stroke="var(--panel)" stroke-width="1.5"><title>${esc(d.name)} ${esc(x.id)} ${fmt(x.score)} — ${esc(x.title)}</title></circle>`;else s+=`<text x="${X(i+1)}" y="${H-m.b+16}" text-anchor="middle" style="fill:var(--bad)">✕</text>`});
+s+=`<text x="${m.l+12}" y="${m.t+16+18*j}" style="fill:${cols[j%4]};font-weight:600">${esc(d.name)} · ${esc(d.runner)} · best ${fmt(d.best)}</text>`});
+for(let i=0;i<=N;i++)s+=`<text x="${X(i)}" y="${H-m.b+16}" text-anchor="middle" style="fill:var(--muted);font-size:11px">${i}</text>`;
+s+=`<text x="${(m.l+W-m.r)/2}" y="${H-8}" text-anchor="middle" style="fill:var(--muted);font-size:11px">finished nodes in order · line = best so far · dot = that node's official score</text>`;
+const refv=Object.values(refs)[0];if(refv!=null)s+=`<text x="${W-m.r}" y="${m.t+12}" text-anchor="end" style="fill:var(--gold);font-size:11px">reference ${esc(Object.keys(refs)[0])} ${fmt(refv)} (off scale)</text>`;
+c.innerHTML=s})();
+document.getElementById('seq').innerHTML=D.map((d,j)=>`<div><h2 style="font-size:14px;margin:0 0 6px;color:${cols[j%4]}">${esc(d.name)}</h2><ol>${d.curve.map(x=>{const cls=x.status!=='done'?'fail':(x.score>=x.best-1e-9&&x.score!=null&&x.score===x.best?'up':'down');return `<li><span class="tag ${cls}">${x.status==='done'?fmt(x.score):'failed'}</span> <code>${esc(x.id)}</code> ${esc(x.title)} <span style="color:var(--muted)">· ${dur(x.t)}</span></li>`}).join('')}</ol></div>`).join('');
+</script></body></html>""".replace("__NAMES__", names.replace("<", "&lt;")).replace("__DATA__", payload)
 
 
 if __name__ == "__main__":
