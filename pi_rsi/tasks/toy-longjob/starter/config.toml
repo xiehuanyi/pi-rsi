@@ -1,0 +1,4 @@
+hidden = 32
+lr = 0.01
+batch = 64
+seed = 0

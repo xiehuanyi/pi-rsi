@@ -30,7 +30,7 @@ def cmd_init(a: argparse.Namespace) -> int:
     utility = UtilityCfg(kind=a.utility_runner or a.runner, model=a.utility_model or a.model, effort=a.utility_effort)
     search = SearchCfg(width_root=a.width_root, width=a.width, depth=a.depth, max_nodes=a.max_nodes,
                        max_parallel=a.parallel, patience=a.patience, target_score=a.target,
-                       max_wallclock_s=a.max_wallclock)
+                       max_wallclock_s=a.max_wallclock, max_gpu_hours=a.max_gpu_hours)
     from .config import HooksCfg
     hooks = HooksCfg(on_finish=a.on_finish, narrative=not a.no_narrative)
     cfg = ExperimentCfg(name=a.name or exp_dir.name, dir=exp_dir, task=task, runner=runner, utility=utility, search=search,
@@ -120,6 +120,26 @@ def cmd_relabel(a: argparse.Namespace) -> int:
             tree.update(n, verdict=verdict, audit=audit)
     orch.render()
     print(f"relabeled {changed} nodes")
+    return 0
+
+
+def cmd_jobd(a: argparse.Namespace) -> int:
+    from .jobs import run_daemon, default_gpus
+    gpus = [int(x) for x in a.gpus.split(",") if x.strip()] if a.gpus is not None else default_gpus()
+    run_daemon(gpus, max_cpu_jobs=a.max_cpu_jobs)
+    return 0
+
+
+def cmd_jobs(a: argparse.Namespace) -> int:
+    from .jobs import list_jobs, cancel, daemon_alive, jobs_dir
+    if a.cancel:
+        cancel(a.cancel)
+        print("cancel requested", a.cancel)
+        return 0
+    print(f"daemon alive: {daemon_alive()}  dir: {jobs_dir()}")
+    for j in list_jobs(a.status):
+        print(f"{j.id} {j.status:<8} {j.owner:<28} gpus={j.assigned_gpus or j.gpus} step={j.last_step} value={j.last_value} "
+              f"{human_duration(j.duration_s)} {j.reason}")
     return 0
 
 
@@ -273,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--patience", type=int, default=4)
     i.add_argument("--target", type=float, default=None)
     i.add_argument("--max-wallclock", type=int, default=None)
+    i.add_argument("--max-gpu-hours", type=float, default=None)
     i.add_argument("--notes", default="")
     i.add_argument("--on-finish", default="", help="shell command run after the final report; {exp_dir} is substituted")
     i.add_argument("--no-narrative", action="store_true")
@@ -304,6 +325,16 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    jd = sub.add_parser("jobd", help="run the job queue daemon (GPU assignment, timeouts, early termination)")
+    jd.add_argument("--gpus", default=None, help="comma-separated GPU ids (default: all visible)")
+    jd.add_argument("--max-cpu-jobs", type=int, default=2)
+    jd.set_defaults(fn=cmd_jobd)
+
+    js = sub.add_parser("jobs", help="list queue jobs or cancel one")
+    js.add_argument("--status")
+    js.add_argument("--cancel")
+    js.set_defaults(fn=cmd_jobs)
 
     c = sub.add_parser("continue", help="extend a finished experiment: more nodes, reset stall counter, optional focus node and note")
     c.add_argument("dir")

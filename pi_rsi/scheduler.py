@@ -82,6 +82,10 @@ class Scheduler:
             return "target_reached"
         if s.max_wallclock_s and (now_ts() - self.o.started_ts) > s.max_wallclock_s:
             return "wallclock"
+        if s.max_gpu_hours and self.cfg.task.job_enabled:
+            from .jobs import gpu_seconds
+            if gpu_seconds(self.cfg.name + "/") / 3600.0 > s.max_gpu_hours:
+                return "gpu_hours"
         finished = [n for n in self.tree.non_root() if n.status in ("done", "failed") and not self.will_retry(n)]
         if len(finished) >= s.max_nodes:
             return "max_nodes"

@@ -13,6 +13,10 @@ from .base import Runner
 class ScriptRunner(Runner):
     kind = "script"
 
+    def new_session_id(self) -> str | None:
+        import uuid
+        return str(uuid.uuid4())
+
     def build_agent_cmd(self, prompt_file: Path, cwd: Path, max_turns: int, session_dir: Path,
                         session_id: str | None = None) -> list[str]:
         return [self.model, str(prompt_file), "agent"]

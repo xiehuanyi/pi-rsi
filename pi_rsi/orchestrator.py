@@ -120,7 +120,7 @@ class Orchestrator:
             score, metrics = None, {}
             if cfg.search.root_eval:
                 self.log("root_eval", seedset=cfg.task.official_seedset)
-                metrics = run_eval(cfg, cfg.repo_dir, cfg.task.official_seedset, nd / "eval")
+                metrics = run_eval(cfg, cfg.repo_dir, cfg.task.official_seedset, nd / "eval", owner=f"{cfg.name}/root")
                 score = score_of(cfg, metrics)
                 self.log("root_eval_done", score=score, elapsed_s=metrics.get("_eval", {}).get("elapsed_s"))
             root = Node(id="root", parent=None, depth=0, title="baseline", hypothesis="The untouched starter code.",
@@ -266,14 +266,26 @@ class Orchestrator:
             wt = cfg.worktrees_dir / best.id
             if wt.exists():
                 try:
-                    self.log("final_eval", node=best.id, seedset=cfg.task.final_seedset)
-                    m = run_eval(cfg, wt, cfg.task.final_seedset, cfg.nodes_dir / best.id / "eval", tag="final")
-                    final["best_final_score"] = score_of(cfg, m)
-                    final["best_final_metrics"] = {k: v for k, v in m.items() if k != "per_seed"}
+                    k = max(1, int(cfg.task.final_top_k))
+                    ranked = sorted(self.tree.scored(), key=lambda n: (-n.score if self.tree.higher_is_better() else n.score))
+                    top = [n for n in ranked if n.id != "root"][:k]
+                    ranking = []
+                    for n in top:
+                        self.log("final_eval", node=n.id, seedset=cfg.task.final_seedset)
+                        mm = run_eval(cfg, cfg.worktrees_dir / n.id, cfg.task.final_seedset, cfg.nodes_dir / n.id / "eval", tag="final",
+                                      owner=f"{cfg.name}/{n.id}")
+                        ranking.append({"node": n.id, "official": n.score, "final": score_of(cfg, mm)})
+                    final["ranking"] = ranking
+                    fb = min(ranking, key=lambda r: (-(r["final"] or -1e18) if self.tree.higher_is_better() else (r["final"] if r["final"] is not None else 1e18)))
+                    final["best_by_final"] = fb["node"]
+                    m = read_json(cfg.nodes_dir / fb["node"] / "eval" / f"metrics.{cfg.task.final_seedset}.final.json") or {}
+                    final["best_final_score"] = fb["final"]
+                    final["best_final_metrics"] = {k2: v for k2, v in m.items() if k2 not in ("per_seed", "per_item")}
                     if cfg.task.final_eval_root:
                         rm = run_eval(cfg, cfg.repo_dir, cfg.task.final_seedset, cfg.nodes_dir / "root" / "eval", tag="final")
                         final["root_final_score"] = score_of(cfg, rm)
-                    self.log("final_eval_done", best=final["best_final_score"], root=final.get("root_final_score"))
+                    self.log("final_eval_done", best=final["best_final_score"], root=final.get("root_final_score"),
+                             best_by_final=final.get("best_by_final"))
                 except EvalError as e:
                     final["final_eval_error"] = str(e)
                     self.log("final_eval_failed", error=str(e))

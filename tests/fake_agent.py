@@ -39,10 +39,32 @@ if mode == "json":
         end({})
     sys.exit(0)
 
+if mode == "resume":  # analysis session (job mode) or handoff rescue: append the official result to the handoff
+    m = re.search(r"official score \([^)]*\): ([^\n]+)", prompt)
+    nd = re.search(r"`([^`]+)/HANDOFF.md`", prompt)
+    if nd:
+        with open(Path(nd.group(1)) / "HANDOFF.md", "a") as f:
+            f.write(f"\n(official result seen by fake analysis: {m.group(1) if m else '?'})\n")
+    end()
+    sys.exit(0)
+
 node_dir = Path(re.search(r"Node notes directory.*?`([^`]+)`", prompt).group(1))
 node_id = re.search(r"- Node: `([^`]+)`", prompt).group(1)
 retry = "this is a retry" in prompt.lower()
 node_dir.mkdir(parents=True, exist_ok=True)
+if Path("config.toml").exists() and Path("src/trainer.py").exists():   # toy long-job task: tweak the config, always succeed
+    import hashlib
+    h = int(hashlib.md5(node_id.encode()).hexdigest(), 16)
+    lr = [0.005, 0.01, 0.02, 0.03, 0.001][h % 5]
+    hidden = [16, 32, 64][h % 3]
+    Path("config.toml").write_text(f"hidden = {hidden}\nlr = {lr}\nbatch = 64\nseed = 0\n")
+    subprocess.run(["git", "commit", "-qam", f"fake: lr={lr} hidden={hidden}"], check=False)
+    (node_dir / "PROGRESS.md").write_text(f"# Progress {node_id}\n- set lr={lr} hidden={hidden}\n")
+    (node_dir / "HANDOFF.md").write_text(f"# Handoff {node_id}: fake\n## Hypothesis\nlr={lr} hidden={hidden}\n## What I did\nedited config\n## Result\nsmoke: not run\n")
+    (node_dir / "proposals.json").write_text(json.dumps([{"title": "fake child", "hypothesis": "another config", "type": "idea",
+                                                          "expected_gain": "none", "risk": "none"}]))
+    end()
+    sys.exit(0)
 with open(node_dir / "PROGRESS.md", "a") as f:
     f.write(f"# Progress {node_id}\n- fake worker start (retry={retry})\n")
 print(json.dumps({"type": "text", "data": f"fake worker on {node_id}, retry={retry}"}))

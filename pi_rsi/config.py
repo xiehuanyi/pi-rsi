@@ -55,6 +55,7 @@ class SearchCfg:
     max_retries: int = 1         # retries per hypothesis after a crash/failed node
     target_score: float | None = None
     max_wallclock_s: int | None = None
+    max_gpu_hours: float | None = None   # job mode: sum of job duration × gpus for this experiment
     root_eval: bool = True       # evaluate the starter to get the root score
 
 
@@ -79,6 +80,16 @@ class TaskCfg:
     higher_is_better: bool = True
     score_key: str = "score"
     reference_scores: dict[str, float] = field(default_factory=dict)
+    # job mode (long-running evaluations through the job queue) ------------------------------------
+    job_enabled: bool = False
+    job_command: str = "{python} train.py --budget {budget} --run-dir {run_dir} {resume_flag}"   # cwd = worktree
+    job_gpus: int = 0
+    job_budgets: dict[str, float] = field(default_factory=dict)   # level -> budget (task-defined units, e.g. seconds)
+    job_timeout_s: int = 3600
+    job_stall_s: int = 600
+    job_resumable: bool = False
+    job_early_stop: dict[str, Any] = field(default_factory=dict)  # {warmup_frac, margin, patience_points}
+    final_top_k: int = 1          # how many top nodes get the final (full) evaluation
 
 
 @dataclass

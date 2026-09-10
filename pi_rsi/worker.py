@@ -88,15 +88,22 @@ def run_node(orch, node: Node) -> None:
         # 6. official evaluation -----------------------------------------------
         tree.update(node, status="evaluating")
         orch.render()
+        best_now = tree.best()
+        incumbent = None
+        if cfg.task.job_enabled and best_now is not None:
+            incumbent = cfg.nodes_dir / best_now.id / "eval" / f"run.{cfg.task.official_seedset}" / "metrics.jsonl"
         try:
-            metrics = run_eval(cfg, worktree, cfg.task.official_seedset, nd / "eval")
+            metrics = run_eval(cfg, worktree, cfg.task.official_seedset, nd / "eval", owner=f"{cfg.name}/{node.id}",
+                               incumbent_path=incumbent)
         except EvalError as e:
             raise NodeFailure(f"official evaluation failed: {e}")
         score = score_of(cfg, metrics)
         if score is None:
             raise NodeFailure(f"evaluator produced no '{cfg.task.score_key}' in metrics")
-        quick = read_json(worktree / "metrics.quick.json") or {}
+        quick = read_json(worktree / "metrics.quick.json") or read_json(worktree / "runs" / cfg.task.quick_seedset / "metrics.json") or {}
         quick_score = quick.get(cfg.task.score_key)
+        if cfg.task.job_enabled and res.session_id and hasattr(orch.worker_runner, "resume_agent"):
+            _analysis_session(orch, node, nd, worktree, res.session_id, metrics, score, parent)
         proposals = _load_proposals(nd / "proposals.json")
         gitlog = gitops.log_oneline(worktree, base)
         diffstat = gitops.diff_stat(worktree, base)
@@ -170,3 +177,27 @@ def _record_audit(orch, node: Node, audit: dict, gitlog: str, diffstat: str) -> 
         append_text(cfg.insights_path, f"- {ins.strip()} [{node.id}, score {fmt_score(node.score)}]\n")
     for de in audit.get("deadends", []) or []:
         append_text(cfg.deadends_path, f"- {de.strip()} [{node.id}]\n")
+
+
+def _analysis_session(orch, node: Node, nd: Path, worktree: Path, session_id: str, metrics: dict, score: float, parent: Node) -> None:
+    """Job mode: wake the worker's session once the official run finished so the handoff reflects the real result."""
+    cfg, tree = orch.cfg, orch.tree
+    best = tree.best()
+    root = tree.get("root")
+    run_dir = Path(metrics.get("_eval", {}).get("run_dir", ""))
+    curve_lines = []
+    if run_dir and (run_dir / "metrics.jsonl").exists():
+        pts = [l for l in (run_dir / "metrics.jsonl").read_text().splitlines() if l.strip()]
+        step = max(1, len(pts) // 12)
+        curve_lines = pts[::step][:12] + ([pts[-1]] if pts and pts[-1] not in pts[::step][:12] else [])
+    from .prompts import render, direction
+    prompt = render("analysis", level=cfg.task.official_seedset, node_id=node.id, score_key=cfg.task.score_key,
+                    direction=direction(cfg), score=fmt_score(score), parent_score=fmt_score(parent.score),
+                    best_score=fmt_score(best.score if best else None), root_score=fmt_score(root.score),
+                    run_summary=json.dumps({k: v for k, v in metrics.items() if k not in ("per_item", "per_seed", "_eval")})[:1500],
+                    curve="\n".join(curve_lines) or "(no curve)", node_dir=str(nd))
+    orch.log("analysis_start", node=node.id)
+    r = orch.worker_runner.resume_agent(session_id, prompt, cwd=worktree, log_path=nd / "runner.analysis.jsonl", max_turns=10,
+                                        timeout_s=900, idle_timeout_s=300)
+    orch.add_cost("worker", r)
+    orch.log("analysis_end", node=node.id, ok=r.ok, error=r.error, duration_s=round(r.duration_s, 1))

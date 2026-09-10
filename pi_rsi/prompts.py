@@ -72,12 +72,23 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
         expected_gain=prop.get("expected_gain", "unknown"), risk=prop.get("risk", "unknown"),
         path_block=_path_block(cfg, tree, node), parent_handoff=parent_handoff,
         insights=read_text(cfg.insights_path, "(none yet)"), deadends=read_text(cfg.deadends_path, "(none yet)"),
-        quick_cmd=cfg.task.worker_eval_command.format(seedset=cfg.task.quick_seedset, python=_python(cfg)),
+        quick_cmd=_quick_cmd(cfg),
         val_rule=_val_rule(cfg),
     )
 
 
+def _quick_cmd(cfg: ExperimentCfg) -> str:
+    if cfg.task.job_enabled:
+        from .evaluator import job_command
+        return " ".join(job_command(cfg, cfg.task.quick_seedset, f"runs/{cfg.task.quick_seedset}"))
+    return cfg.task.worker_eval_command.format(seedset=cfg.task.quick_seedset, python=_python(cfg))
+
+
 def _val_rule(cfg: ExperimentCfg) -> str:
+    if cfg.task.job_enabled:
+        return (f"The official `{cfg.task.official_seedset}` run (budget {cfg.task.job_budgets.get(cfg.task.official_seedset)}) is "
+                f"submitted to the job queue by the harness after you finish; do not run it yourself. When it completes you will "
+                f"be woken up in this same session to update the handoff with its result.")
     cmd = cfg.task.worker_val_command
     if cmd is None:
         cmd = cfg.task.worker_eval_command

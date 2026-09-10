@@ -1,0 +1,30 @@
+name = "toy-longjob"
+
+[task]
+brief = "TASK.md"
+docs = ["docs/CONTRACT.md"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+
+[eval]
+eval_command = ""
+worker_eval_command = ""
+worker_val_command = ""
+seedsets = ["smoke", "proxy", "full"]
+official_seedset = "proxy"
+final_seedset = "full"
+final_eval_root = false
+quick_seedset = "smoke"
+eval_timeout_s = 600
+higher_is_better = false
+score_key = "score"
+job_enabled = true
+job_command = "{python} eval/run.py --budget {budget} --run-dir {run_dir} {resume_flag}"
+job_gpus = 0
+job_budgets = { smoke = 4, proxy = 12, full = 20 }
+job_timeout_s = 300
+job_stall_s = 60
+job_resumable = true
+job_early_stop = { warmup_frac = 0.3, margin = 0.15, patience_points = 3 }
+final_top_k = 2
