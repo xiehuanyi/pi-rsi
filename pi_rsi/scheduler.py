@@ -92,6 +92,10 @@ class Scheduler:
         cands = [n for n in self.tree.nodes.values() if self.expandable(n)]
         if not cands:
             return None
+        # breadth first at the root: every root candidate is launched before any deeper expansion
+        root = self.tree.nodes.get("root")
+        if root is not None and root in cands:
+            return root
         hib = self.tree.higher_is_better()
         cands.sort(key=lambda n: ((-n.score if hib else n.score), n.depth, n.id))
         return cands[0]
