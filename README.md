@@ -62,8 +62,31 @@ xdg-open ~/.pi-rsi/experiments/demo/tree.html   # re-rendered after every event
 
 `rsi run` on an existing experiment resumes it: nodes that were running when the process died are marked failed,
 diagnosed, and retried from their last commit. `scripts/supervise.sh <exp dir>` keeps the loop alive across crashes.
-`rsi ops <exp> "<problem>"` hands an infrastructure problem to the logistics agent; `rsi write <exp>` produces a
-human narrative; `rsi relabel <exp>` recomputes verdicts with the paired noise estimate.
+
+More commands:
+
+| command | what |
+|---|---|
+| `rsi new-task <name> "<problem>" --data <dir\|kaggle:slug>` | clarification phase: data profile, questions with defaults, a builder agent writes the task pack, the harness verifies the evaluator on the starter |
+| `rsi continue <exp> --max-nodes +N [--from n004] [--note "..."]` | extend a finished run: more budget, stall counter reset, optional focus node and a note every worker/planner sees |
+| `rsi submit <exp> [--node n008]` | final-level evaluation (e.g. Kaggle submission) with a per-experiment cap and `SUBMISSIONS.md` ledger |
+| `rsi ops <exp> "<problem>"` | logistics agent with tools: fixes environments, data prep, evaluator bugs; auto-called after two consecutive evaluator failures |
+| `rsi write <exp>` / `rsi report <exp>` / `rsi relabel <exp>` / `rsi reeval <exp>` | narrative for humans; rebuild REPORT.md; recompute verdicts with paired noise; re-run the official evaluator on every node |
+| `rsi sentinel [--interval 600] [--kill-orphans] [--prune]` | infra check without an LLM: disk, GPUs, dead orchestrators, orphan processes, stale worktrees |
+| `rsi repair <exp>` | harness self-repair: an ops agent fixes recorded harness crashes on a `repair/<ts>` git branch with a test; a human merges |
+| `rsi jobd` / `rsi jobs` | job queue daemon and listing (job mode, below) |
+
+## Job mode (long-running evaluations)
+
+Task packs with `job_enabled = true` send every official evaluation through a queue (`rsi jobd`, started automatically)
+that assigns GPUs (`CUDA_VISIBLE_DEVICES`), enforces `job_timeout_s`, kills stalled runs (no new curve point for
+`job_stall_s`), kills NaN runs, and early-stops runs whose curve is worse than the incumbent's by `margin` for
+`patience_points` checkpoints after `warmup_frac`. Jobs write `metrics.jsonl` (`{"step","value"}` per checkpoint) and
+`metrics.json` (final score); `job_resumable = true` re-submits a failed job once with `--resume`. Levels replace seed
+sets (`job_budgets = { smoke = ..., proxy = ..., full = ... }`): workers iterate on `smoke`, the official score is
+`proxy`, and the top `final_top_k` nodes get a `full` run at the end. After the official job the worker's session is
+woken once (analysis session) to fold the real result into its handoff. `search.max_gpu_hours` caps the run.
+`tasks/toy-longjob` exercises all of this on CPU in a few minutes (`tests/test_jobs.sh`).
 
 ## What a node produces (`experiments/<name>/nodes/<id>/`)
 
@@ -124,5 +147,7 @@ Baseline starter ≈ 3,590; a strong hand-engineered agent ≈ 138,000 on the va
 
 ```bash
 tests/test_loop.sh        # whole loop with a fake agent: planner, failure, diagnoser, retry, audit, report (~1 min)
+tests/test_jobs.sh        # job mode: queue daemon, curves, analysis session, top-k final (~3 min, CPU)
+tests/test_jobs_unit.py   # daemon kill rules: early stop, NaN, stall, timeout
 tests/test_pi_runner.sh   # pi runner against a local mock OpenAI server
 ```

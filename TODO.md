@@ -12,32 +12,33 @@ Ordered by what makes the short-job version solid first. Long-horizon items are 
       "|delta| below noise"). Add a per-task noise floor.
 - [ ] Sparse-reward support: lexicographic scores (primary + secondary metric) in the scheduler; breadth-first when all
       candidates tie.
-- [ ] `rsi new-task`: interactive clarification phase (agent asks follow-ups, offers deliverable/metric options,
-      drafts `TASK.md`, evaluator and starter) instead of hand-written task packs.
-- [ ] Human async intervention: `HUMAN.md` in a node dir is read by the next worker (exists), add `rsi note <exp> <node>`.
+- [x] `rsi new-task`: clarification phase (profile → questions with defaults → builder agent → harness verification).
+      Built `st-auto` from the Spaceship data unattended (`--yes`); the interactive terminal path needs a human test.
+- [x] Human async intervention: experiment-level `HUMAN.md` via `rsi continue --note`; node-level `HUMAN.md` read by the next worker.
 - [ ] pi runner in production: test with a real provider (API key or pi `/login`), custom compaction that reloads
       PROGRESS.md instead of summarizing.
 - [ ] Reviewer pass on code quality before a node is accepted (norms: module size, determinism, no eval edits).
-- [ ] Submission etiquette: cap Kaggle submissions per experiment; keep the LB as verification, never as the search signal.
+- [x] Submission etiquette: `hooks.max_submissions` cap + `SUBMISSIONS.md` ledger (`rsi submit`).
 
 ## logistics agents (extract what humans should not babysit)
 
 - [x] ops agent (`rsi ops`): tool-using, fixes environments/evaluators, auto-called after two consecutive evaluator failures.
 - [x] writer (`rsi write`): narrative for the blog page; publisher (`scripts/publish_blog.py`).
-- [ ] data agent: downloads/splits competition data, builds the hidden holdout, documents leakage risks.
-- [ ] submitter agent: manages Kaggle submissions, daily limits, LB tracking and CV/LB correlation notes.
-- [ ] infra sentinel: disk/GPU/CPU pressure, orphaned processes, stale worktrees; runs on a timer, no LLM unless needed.
-- [ ] harness-repair agent: when the harness itself throws (events.jsonl `node_crash`), open a fix branch with a test.
+- [x] data agent: part of `rsi new-task` (download, group-aware hidden split, leakage notes in NEWTASK.md).
+- [x] submitter: `rsi submit` with cap and ledger (holdout vs LB per submission). CV/LB correlation summary still manual.
+- [x] infra sentinel: `rsi sentinel` (disk, GPUs, dead orchestrators, orphans, stale worktrees), `--interval` for a timer.
+- [x] harness-repair agent: `rsi repair <exp>` collects crashes, ops agent fixes on `repair/<ts>` with a test; human merges.
 
 ## long-horizon / expensive experiments (parked)
 
-- [ ] Job queue with GPU assignment and a `submitted → running_job → analyzing` node lifecycle (worker submits,
-      session ends; an analysis session is woken when the job finishes).
-- [ ] Evaluation ladder (smoke → proxy → full) with promotion rules; budgets in GPU-hours; priority = gain / cost.
-- [ ] Curve-based early termination (NaN, stall, below-incumbent at the same step) without an LLM in the loop.
-- [ ] Checkpoint/resume contract for task packs; idempotent job restarts.
+- [x] Job queue with GPU assignment; official evaluation runs as a job; the worker session is woken for an analysis
+      pass when the job finishes (`pi_rsi/jobs.py`, `tests/test_jobs.sh`).
+- [x] Evaluation ladder (smoke → proxy → full) with `final_top_k` promotion; `max_gpu_hours` budget. Priority = gain / cost: not yet.
+- [x] Curve-based early termination (NaN, stall, timeout, below-incumbent at the same step) in the daemon.
+- [x] Checkpoint/resume contract (`--resume`, `job_resumable`); one automatic resubmission after a failure.
 - [ ] Proxy-to-full rank transfer checks (two or three budget scales) before trusting the ladder.
-- [ ] Test task: fixed-time-budget small LM training on the 3090 (1-3 h full, 5-10 min proxy), then a real Kaggle GPU task.
+- [ ] Test task on a real GPU: fixed-time-budget small LM training on the 3090 (1-3 h full, 5-10 min proxy), then a Kaggle
+      GPU task. `tasks/toy-longjob` (CPU) is the machinery test only.
 - [ ] Sparse-reward tasks such as ARC-AGI-2 fine-tuning: only after the ladder and secondary metrics exist.
 
 ## self-improvement (the "rsi" part, parked until the above is boring)
