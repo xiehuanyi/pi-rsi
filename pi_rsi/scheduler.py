@@ -54,6 +54,19 @@ class Scheduler:
                 k += 1
         return k
 
+    def runner_broken(self) -> bool:
+        """Three consecutive quick abnormal endings without any output means the agent runtime itself is broken."""
+        k = 0
+        for n in reversed(self.tree.finished_in_order()):
+            if n.status == "failed" and (n.failure or "").startswith("worker ended abnormally") and (n.duration_s or 0) < 90:
+                k += 1
+                if k >= 3:
+                    return True
+                continue
+            if n.status in ("done", "failed"):
+                break
+        return False
+
     # stop conditions ----------------------------------------------------------
     def stop_reason(self) -> str | None:
         s = self.cfg.search
@@ -65,6 +78,8 @@ class Scheduler:
         finished = [n for n in self.tree.non_root() if n.status in ("done", "failed") and not self.will_retry(n)]
         if len(finished) >= s.max_nodes:
             return "max_nodes"
+        if self.runner_broken():
+            return "runner_broken"
         if self.consecutive_without_best() >= s.patience:
             return "patience"
         return None
@@ -92,22 +107,26 @@ class Scheduler:
             if parent is None:
                 return None
             unused = [i for i in range(len(parent.proposals)) if i not in parent.proposals_used]
-            if not unused:
-                need = self.cap(parent) - len(self.counted_children(parent))
-                try:
-                    props = self.o.utility.plan_children(parent, max(1, need))
-                except Exception as e:
-                    self.o.log("planner_failed", parent=parent.id, error=str(e))
-                    # mark parent as exhausted so we do not loop on it
-                    self.tree.update(parent, proposals_used=list(range(len(parent.proposals))) + [-1])
-                    return None
-                if not props:
+            need = self.cap(parent) - len(self.counted_children(parent))
+        if not unused:
+            # planner call happens outside the tree lock (it is an LLM call)
+            try:
+                props = self.o.utility.plan_children(parent, max(1, need))
+            except Exception as e:
+                self.o.log("planner_failed", parent=parent.id, error=str(e))
+                props = []
+            with self.tree.lock:
+                if not props:  # mark parent as exhausted so we do not loop on it
                     self.tree.update(parent, proposals_used=list(range(len(parent.proposals))) + [-1])
                     return None
                 self.tree.update(parent, proposals=parent.proposals + props)
                 unused = [i for i in range(len(parent.proposals)) if i not in parent.proposals_used]
                 if not unused:
                     return None
+        with self.tree.lock:
+            unused = [i for i in range(len(parent.proposals)) if i not in parent.proposals_used]
+            if not unused or not self.expandable(parent):
+                return None
             i = unused[0]
             prop = parent.proposals[i]
             self.tree.update(parent, proposals_used=parent.proposals_used + [i])

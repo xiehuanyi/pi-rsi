@@ -76,12 +76,16 @@ def run_node(orch, node: Node) -> None:
                 commit = c2
                 tree.update(node, commit=commit)
 
-        # 4. frozen-path guard ---------------------------------------------
+        # 4. nothing produced by an abnormal session -> failure, not a silent no-change node
+        if not res.ok and commit == base and not (nd / "HANDOFF.md").exists():
+            raise NodeFailure(f"worker ended abnormally ({res.error}) without producing any change")
+
+        # 5. frozen-path guard ---------------------------------------------
         touched = gitops.changed_paths(worktree, base, "HEAD", FROZEN_PATHS)
         if touched:
             raise NodeFailure(f"modified frozen paths: {touched[:5]}")
 
-        # 5. official evaluation -----------------------------------------------
+        # 6. official evaluation -----------------------------------------------
         tree.update(node, status="evaluating")
         orch.render()
         try:
@@ -107,8 +111,8 @@ def run_node(orch, node: Node) -> None:
         orch.log("eval_done", node=node.id, score=score, delta_parent=delta_parent, delta_best=delta_best,
                  elapsed_s=metrics.get("_eval", {}).get("elapsed_s"))
 
-        # 6. audit -------------------------------------------------------------
-        noise = orch.noise_level()
+        # 7. audit -------------------------------------------------------------
+        noise = orch.noise_level(metrics, parent.metrics)
         audit = orch.utility.audit(node, metrics, gitlog, diffstat, noise)
         _record_audit(orch, node, audit, gitlog, diffstat)
         gitops.tag(cfg.repo_dir, f"rsi/{node.id}", commit)

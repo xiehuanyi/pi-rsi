@@ -84,11 +84,16 @@ class Orchestrator:
     def write_state(self) -> None:
         atomic_write_json(self.cfg.dir / "state.json", self.state())
 
-    def noise_level(self) -> float:
+    def noise_level(self, metrics: dict | None = None, parent_metrics: dict | None = None) -> float:
+        """Two standard errors of the difference between the node and its parent (falls back to 1% of baseline)."""
+        sems = []
+        for m in (metrics or {}, parent_metrics or {}):
+            v = m.get("score_sem")
+            if isinstance(v, (int, float)) and v > 0:
+                sems.append(float(v))
+        if sems:
+            return 2.0 * sum(v * v for v in sems) ** 0.5
         root = self.tree.get("root")
-        sem = root.metrics.get("score_sem")
-        if isinstance(sem, (int, float)) and sem > 0:
-            return 2.0 * float(sem)
         return abs(root.score or 1.0) * 0.01
 
     # root ---------------------------------------------------------------------
