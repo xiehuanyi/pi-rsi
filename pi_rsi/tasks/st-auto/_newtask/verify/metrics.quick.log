@@ -1,0 +1,5 @@
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /tmp/st-auto-eval-srk7s_b9/tr0.csv --predict /tmp/st-auto-eval-srk7s_b9/va0.csv --out /tmp/st-auto-eval-srk7s_b9/pred0.csv
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /tmp/st-auto-eval-srk7s_b9/tr1.csv --predict /tmp/st-auto-eval-srk7s_b9/va1.csv --out /tmp/st-auto-eval-srk7s_b9/pred1.csv
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /tmp/st-auto-eval-srk7s_b9/tr2.csv --predict /tmp/st-auto-eval-srk7s_b9/va2.csv --out /tmp/st-auto-eval-srk7s_b9/pred2.csv
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /tmp/st-auto-eval-srk7s_b9/tr3.csv --predict /tmp/st-auto-eval-srk7s_b9/va3.csv --out /tmp/st-auto-eval-srk7s_b9/pred3.csv
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /tmp/st-auto-eval-srk7s_b9/tr4.csv --predict /tmp/st-auto-eval-srk7s_b9/va4.csv --out /tmp/st-auto-eval-srk7s_b9/pred4.csv

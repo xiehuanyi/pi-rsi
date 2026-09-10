@@ -1,0 +1,93 @@
+{
+ "understanding": "This is the Kaggle Spaceship Titanic binary classification task: predict whether each passenger was Transported (True/False) from tabular passenger features. Training data has 8693 labeled rows with HomePlanet, CryoSleep, Cabin, Destination, Age, VIP, amenity spend columns, Name, and the Transported label; the public test set has 4277 unlabeled rows in the same feature schema. PassengerId encodes group membership (gggg_pp) and Cabin encodes deck/number/side, so feature engineering and leakage-aware validation matter. A good solution is a reproducible train→predict pipeline that maximizes classification accuracy and emits a Kaggle-ready submission matching sample_submission.csv.",
+ "deliverable_options": [
+  {
+   "id": "kaggle_pipeline",
+   "title": "End-to-end Kaggle training + submission pipeline",
+   "description": "A CLI/script that trains on train.csv, writes OOF/CV metrics, predicts on test.csv, and produces a submission.csv with columns PassengerId,Transported (boolean or string matching the competition format). Includes preprocessing, feature engineering from Cabin/PassengerId/Name, and a tunable model."
+  },
+  {
+   "id": "sklearn_estimator",
+   "title": "sklearn-compatible estimator package",
+   "description": "A fit/predict estimator (plus optional Pipeline) that can be cross-validated locally; a thin wrapper converts predictions into the Kaggle submission file."
+  },
+  {
+   "id": "notebook_baseline",
+   "title": "Single notebook baseline",
+   "description": "One self-contained notebook that explores, trains, and exports submission.csv with less emphasis on reusable CLI contracts."
+  }
+ ],
+ "metric_options": [
+  {
+   "id": "accuracy",
+   "name": "Accuracy",
+   "direction": "higher",
+   "rationale": "Official Spaceship Titanic competition metric; submissions are scored by fraction of correct Transported labels."
+  },
+  {
+   "id": "roc_auc",
+   "name": "ROC-AUC (probability)",
+   "direction": "higher",
+   "rationale": "Useful secondary metric for ranking/thresholding when the model outputs probabilities, but not what Kaggle ranks."
+  },
+  {
+   "id": "log_loss",
+   "name": "Log loss",
+   "direction": "lower",
+   "rationale": "Penalizes poorly calibrated probabilities; good for model selection but diverges from the official accuracy leaderboard."
+  }
+ ],
+ "protocol": {
+  "quick": "Stratified k-fold (e.g. 5-fold) CV on train.csv only, reporting mean±std accuracy. Optionally group folds by PassengerId group prefix to reduce within-group leakage. Agent may see full train labels and CV scores; keep no held-out slice at this stage.",
+  "validation": "Hold out a fixed stratified (or group-aware) validation split from train.csv that the agent never tunes against iteratively as a pseudo-leaderboard; evaluate accuracy once after model selection on CV. Hide this holdout's labels from repeated agent feedback to limit overfitting to a small local set.",
+  "final": "Train on all train.csv (or CV-chosen config), predict test.csv, write submission.csv, and score via Kaggle API for competition slug spaceship-titanic. Keep Kaggle public/private leaderboard labels fully hidden from the agent; only return the public score (and optionally private if available) as the final metric. Do not join test labels from any source."
+ },
+ "questions": [
+  {
+   "id": "cv_grouping",
+   "question": "How should cross-validation treat PassengerId groups (families sharing a group id)?",
+   "options": [
+    "GroupKFold / group-aware stratified folds by PassengerId group (recommended)",
+    "Ordinary stratified k-fold ignoring groups",
+    "Simple train/valid split only"
+   ],
+   "default": "GroupKFold / group-aware stratified folds by PassengerId group (recommended)"
+  },
+  {
+   "id": "model_family",
+   "question": "Preferred model family for the search?",
+   "options": [
+    "Gradient boosting (LightGBM/XGBoost/CatBoost) with light FE (recommended)",
+    "sklearn ensembles / logistic / RF only (no boosting deps)",
+    "Neural net / tabular deep learning"
+   ],
+   "default": "Gradient boosting (LightGBM/XGBoost/CatBoost) with light FE (recommended)"
+  },
+  {
+   "id": "submission_dtype",
+   "question": "How should Transported be written in submission.csv?",
+   "options": [
+    "Boolean True/False strings matching sample_submission (recommended)",
+    "0/1 integers",
+    "Either is fine if Kaggle accepts it"
+   ],
+   "default": "Boolean True/False strings matching sample_submission (recommended)"
+  },
+  {
+   "id": "compute_budget",
+   "question": "Compute budget for hyperparameter search?",
+   "options": [
+    "Light: few models, default-ish params, minutes (recommended)",
+    "Medium: modest Optuna/grid search, tens of minutes",
+    "Heavy: large HPO / stacking, hours"
+   ],
+   "default": "Light: few models, default-ish params, minutes (recommended)"
+  }
+ ],
+ "risks": [
+  "Group leakage: passengers in the same PassengerId group (and often Cabin/Name patterns) are correlated; random CV can overstate accuracy.",
+  "Missing values and mixed types (CryoSleep/VIP as object/bool, Cabin/Name as high-cardinality strings) can break naive pipelines or create target leakage if filled with target statistics improperly.",
+  "Tiny-to-medium data (~8.7k train) means noisy local accuracy and easy overfitting to public LB via repeated submissions.",
+  "Amenity spends and CryoSleep are strong signals; poor imputation or treating CryoSleep inconsistently can swing accuracy several points."
+ ]
+}

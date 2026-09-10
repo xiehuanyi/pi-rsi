@@ -123,6 +123,14 @@ def cmd_relabel(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_newtask(a: argparse.Namespace) -> int:
+    from .newtask import new_task
+    answers = json.loads(Path(a.answers).read_text()) if a.answers else None
+    new_task(a.name, a.problem, a.data, a.runner, a.model, a.effort, a.utility_model, a.utility_effort, yes=a.yes,
+             answers=answers, max_turns=a.max_turns, timeout_s=a.timeout)
+    return 0
+
+
 def cmd_jobd(a: argparse.Namespace) -> int:
     from .jobs import run_daemon, default_gpus
     gpus = [int(x) for x in a.gpus.split(",") if x.strip()] if a.gpus is not None else default_gpus()
@@ -325,6 +333,21 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    nt = sub.add_parser("new-task", help="clarification phase: problem statement -> questions -> a verified task pack")
+    nt.add_argument("name")
+    nt.add_argument("problem", help="one-line problem statement")
+    nt.add_argument("--data", help="directory/file to copy, or kaggle:<competition>")
+    nt.add_argument("--runner", default="grok", choices=["grok", "pi", "script"])
+    nt.add_argument("--model", default="grok-4.6")
+    nt.add_argument("--effort", default="high")
+    nt.add_argument("--utility-model", default="grok-4.5")
+    nt.add_argument("--utility-effort", default="low")
+    nt.add_argument("--yes", action="store_true", help="accept the recommended defaults without asking")
+    nt.add_argument("--answers", help="JSON file with answers keyed by question id (plus deliverable/metric)")
+    nt.add_argument("--max-turns", type=int, default=120)
+    nt.add_argument("--timeout", type=int, default=3600)
+    nt.set_defaults(fn=cmd_newtask)
 
     jd = sub.add_parser("jobd", help="run the job queue daemon (GPU assignment, timeouts, early termination)")
     jd.add_argument("--gpus", default=None, help="comma-separated GPU ids (default: all visible)")

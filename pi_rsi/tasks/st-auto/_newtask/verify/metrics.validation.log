@@ -1,0 +1,1 @@
+$ /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python train.py --train /media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/starter/data/train.csv --predict /tmp/st-auto-eval-fs6ha1uh/hold_x.csv --out /tmp/st-auto-eval-fs6ha1uh/pred.csv

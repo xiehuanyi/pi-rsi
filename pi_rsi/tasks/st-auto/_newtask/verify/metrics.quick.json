@@ -1,0 +1,36 @@
+{
+ "seedset": "quick",
+ "agent_dir": "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/starter",
+ "metric": "accuracy",
+ "higher_is_better": true,
+ "score": 0.76359,
+ "fold_scores": [
+  0.77283,
+  0.74479,
+  0.76995,
+  0.76923,
+  0.76115
+ ],
+ "score_std": 0.01017,
+ "score_sem": 0.00455,
+ "n": 6954,
+ "elapsed_s": 6.4,
+ "_eval": {
+  "seedset": "quick",
+  "elapsed_s": 7.3,
+  "cmd": [
+   "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python",
+   "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/eval/eval.py",
+   "--agent-dir",
+   "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/starter",
+   "--seedset",
+   "quick",
+   "--out",
+   "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/_newtask/verify/metrics.quick.json",
+   "--python",
+   "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/.venv/bin/python",
+   "--quiet"
+  ],
+  "log": "/media/xieh0a/data/huanyi/Research/AutoResearch/pi-rsi/pi_rsi/tasks/st-auto/_newtask/verify/metrics.quick.log"
+ }
+}

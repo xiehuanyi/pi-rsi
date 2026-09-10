@@ -1,0 +1,36 @@
+# new-task st-auto
+
+created 2026-09-10T17:10:50+00:00
+
+## Problem
+Kaggle Spaceship Titanic: predict whether each passenger was Transported (binary), competition metric is accuracy; we can submit to Kaggle (competition slug spaceship-titanic)
+
+## Decisions
+```json
+{
+ "deliverable": "kaggle_pipeline: End-to-end Kaggle training + submission pipeline — A CLI/script that trains on train.csv, writes OOF/CV metrics, predicts on test.csv, and produces a submission.csv with columns PassengerId,Transported (boolean or string matching the competition format). Includes preprocessing, feature engineering from Cabin/PassengerId/Name, and a tunable model.",
+ "metric": "accuracy: Accuracy (higher is better) — Official Spaceship Titanic competition metric; submissions are scored by fraction of correct Transported labels.",
+ "cv_grouping": "GroupKFold / group-aware stratified folds by PassengerId group (recommended)",
+ "model_family": "Gradient boosting (LightGBM/XGBoost/CatBoost) with light FE (recommended)",
+ "submission_dtype": "Boolean True/False strings matching sample_submission (recommended)",
+ "compute_budget": "Light: few models, default-ish params, minutes (recommended)",
+ "protocol": {
+  "quick": "Stratified k-fold (e.g. 5-fold) CV on train.csv only, reporting mean±std accuracy. Optionally group folds by PassengerId group prefix to reduce within-group leakage. Agent may see full train labels and CV scores; keep no held-out slice at this stage.",
+  "validation": "Hold out a fixed stratified (or group-aware) validation split from train.csv that the agent never tunes against iteratively as a pseudo-leaderboard; evaluate accuracy once after model selection on CV. Hide this holdout's labels from repeated agent feedback to limit overfitting to a small local set.",
+  "final": "Train on all train.csv (or CV-chosen config), predict test.csv, write submission.csv, and score via Kaggle API for competition slug spaceship-titanic. Keep Kaggle public/private leaderboard labels fully hidden from the agent; only return the public score (and optionally private if available) as the final metric. Do not join test labels from any source."
+ }
+}
+```
+
+## Builder result
+```json
+{
+ "ok": true,
+ "starter_quick": 0.76359,
+ "starter_validation": 0.76481,
+ "notes": "Group-aware stratified 80/20 split; logistic starter; final Kaggle submit not executed at pack build."
+}
+```
+
+## Harness verification
+quick: starter score = 0.76359; validation: starter score = 0.76481
