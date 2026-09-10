@@ -1,5 +1,8 @@
 # pi-rsi — auto-research harness (tree search + handoffs around headless coding agents)
 
+Status: v0.1, research prototype. Built and tested on one Linux workstation with the Grok CLI and a pinned
+[pi](https://github.com/earendil-works/pi) 0.85.1. MIT licensed. Experiment write-ups: https://blog.pocketplay.win/rsi/
+
 pi-rsi runs a long-horizon research loop: it takes a task pack (problem statement, starter code, **frozen evaluator**),
 grows a search tree of hypotheses, and lets a headless coding agent implement one hypothesis per node in its own git
 worktree. Every node ends with a machine-parsed handoff, an official score computed by the harness, and an audited
@@ -93,7 +96,13 @@ repo for the worker's convenience but always scores with its own frozen copy, an
 fails the node.
 
 `tasks/kaggriculture`: Kaggle's farming-sim competition environment (CPU only, ~2 s per game, deterministic seeds).
-Baseline starter ≈ 3,590; a strong hand-engineered agent ≈ 138,000 on the validation seeds.
+Baseline starter ≈ 3,590; a strong hand-engineered agent ≈ 138,000 on the validation seeds. First results
+(grok-4.6 vs grok-4.5, one run each, same budget): 24,614 vs 37,329 on validation seeds after 10 and 8 nodes.
+
+## Requirements
+
+- Linux, Python 3.11+, Node 22 (for the pinned pi), git, `uv` or `pip`.
+- An agent runtime: the `grok` CLI logged in with a subscription, or any pi-supported provider.
 
 ## Tests
 
