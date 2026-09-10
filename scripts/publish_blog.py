@@ -46,7 +46,7 @@ def publish_experiment(blog: Path, exp_dir: Path) -> dict:
     if files_dir.exists():
         shutil.rmtree(files_dir)
     files_dir.mkdir(parents=True)
-    for f in ["REPORT.md", "INSIGHTS.md", "DEADENDS.md", "tree.md", "rsi.toml", "final.json", "costs.json"]:
+    for f in ["REPORT.md", "NARRATIVE.md", "INSIGHTS.md", "DEADENDS.md", "tree.md", "rsi.toml", "final.json", "costs.json"]:
         if (exp_dir / f).exists():
             shutil.copy2(exp_dir / f, files_dir / f)
     for nd in sorted((exp_dir / "nodes").glob("*")):
@@ -74,6 +74,7 @@ def publish_experiment(blog: Path, exp_dir: Path) -> dict:
              f"[打开交互式搜索树](/rsi/runs/{name}/) · [REPORT.md](/files/rsi/runs/{name}/REPORT.md) · "
              f"[INSIGHTS.md](/files/rsi/runs/{name}/INSIGHTS.md) · [DEADENDS.md](/files/rsi/runs/{name}/DEADENDS.md) · "
              f"[rsi.toml](/files/rsi/runs/{name}/rsi.toml)", "",
+             *(["## 叙述", "", read_text(exp_dir / "NARRATIVE.md").strip(), ""] if (exp_dir / "NARRATIVE.md").exists() else []),
              "## 结果", "",
              "| 项目 | 值 |", "|---|---|",
              f"| 指标 | `{cfg.task.score_key}`，{better} is better |",
