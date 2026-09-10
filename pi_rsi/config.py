@@ -42,6 +42,7 @@ class HooksCfg:
     on_finish: str = ""          # shell command run after the final report (e.g. publish to the blog); {exp_dir} is substituted
     narrative: bool = True       # writer pass at the end (NARRATIVE.md)
     narrative_language: str = "Chinese"
+    max_submissions: int = 3     # cap on final-level evaluations (e.g. Kaggle submissions) per experiment
 
 
 @dataclass

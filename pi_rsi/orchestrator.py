@@ -261,6 +261,9 @@ class Orchestrator:
             final["best_commit"] = best.commit
             final["note"] = "final evaluation reused: best node unchanged since the previous finish"
             self.log("final_eval_reused", node=best.id)
+        elif best is not None and best.id != "root" and cfg.task.final_seedset and _cap_reached(cfg):
+            final["note"] = f"final evaluation skipped: submission cap {cfg.hooks.max_submissions} reached (see SUBMISSIONS.md)"
+            self.log("final_eval_skipped", reason="submission cap")
         elif best is not None and best.id != "root" and cfg.task.final_seedset:
             final["best_commit"] = best.commit
             wt = cfg.worktrees_dir / best.id
@@ -325,6 +328,11 @@ def _paired_noise(m1: dict, m2: dict) -> float | None:
         s = float(m1.get("score") or 0.0)
         return 2.0 * sem_mean / (2.0 * max(s, 1e-9))
     return 2.0 * sem_mean
+
+
+def _cap_reached(cfg: ExperimentCfg) -> bool:
+    from .logistics import submissions
+    return bool(cfg.hooks.max_submissions) and len(submissions(cfg)) >= cfg.hooks.max_submissions
 
 
 def _harness_commit() -> str:

@@ -123,6 +123,44 @@ def cmd_relabel(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_submit(a: argparse.Namespace) -> int:
+    from .orchestrator import Orchestrator
+    from .logistics import submit, submissions
+    cfg = load_experiment(_exp(a.dir))
+    orch = Orchestrator(cfg, verbose=True)
+    if a.list:
+        for r in submissions(cfg):
+            print(f"{r['time']} {r['node']} {fmt_score(r['score'])} {r['file']}")
+        return 0
+    row = submit(cfg, orch.tree, a.node, cfg.hooks.max_submissions)
+    print(json.dumps(row, indent=1))
+    return 0
+
+
+def cmd_sentinel(a: argparse.Namespace) -> int:
+    from .home import experiments_dir
+    from .logistics import sentinel
+    root = Path(a.root).resolve() if a.root else experiments_dir()
+    while True:
+        rep = sentinel(root, prune=a.prune, kill_orphans=a.kill_orphans)
+        print(json.dumps(rep, indent=1, ensure_ascii=False))
+        if not a.interval:
+            return 0
+        import time as _t
+        _t.sleep(a.interval)
+
+
+def cmd_repair(a: argparse.Namespace) -> int:
+    from .orchestrator import Orchestrator
+    from .logistics import collect_crashes, repair
+    cfg = load_experiment(_exp(a.dir))
+    orch = Orchestrator(cfg, verbose=True)
+    evidence = collect_crashes(cfg)
+    v = repair(orch, evidence, a.branch)
+    print(json.dumps({k: v.get(k) for k in ("fixed", "summary", "branch", "diffstat", "dir")}, indent=1, ensure_ascii=False))
+    return 0 if v.get("fixed") else 1
+
+
 def cmd_newtask(a: argparse.Namespace) -> int:
     from .newtask import new_task
     answers = json.loads(Path(a.answers).read_text()) if a.answers else None
@@ -333,6 +371,24 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    sb = sub.add_parser("submit", help="final-level evaluation (e.g. Kaggle submission) of a node, with a cap and a ledger")
+    sb.add_argument("dir")
+    sb.add_argument("--node")
+    sb.add_argument("--list", action="store_true")
+    sb.set_defaults(fn=cmd_submit)
+
+    se = sub.add_parser("sentinel", help="infra check: disk, GPUs, dead orchestrators, orphan processes, stale worktrees")
+    se.add_argument("--root", help="experiments directory (default: the configured one)")
+    se.add_argument("--interval", type=int, default=0, help="repeat every N seconds")
+    se.add_argument("--prune", action="store_true", help="remove worktrees of finished experiments outside the best path")
+    se.add_argument("--kill-orphans", action="store_true")
+    se.set_defaults(fn=cmd_sentinel)
+
+    rr = sub.add_parser("repair", help="harness self-repair: an ops agent fixes recorded harness crashes on a git branch")
+    rr.add_argument("dir")
+    rr.add_argument("--branch")
+    rr.set_defaults(fn=cmd_repair)
 
     nt = sub.add_parser("new-task", help="clarification phase: problem statement -> questions -> a verified task pack")
     nt.add_argument("name")
