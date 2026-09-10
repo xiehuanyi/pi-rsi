@@ -49,7 +49,10 @@ class Scheduler:
         """Consecutive finished nodes (finish order) without a new global best. The root's own candidates (depth 1)
         are the breadth-first exploration layer and never count: siblings of the best finishing later are not stalls."""
         k = 0
+        since = self.tree.meta.get("continue_from") or ""
         for n in reversed(self.tree.finished_in_order()):
+            if since and (n.finished_at or "") < since:
+                break  # nodes before the last `rsi continue` do not count as stalls
             if n.status == "done" and n.delta_best is not None and n.delta_best > 0:
                 break
             if n.depth <= 1:
@@ -96,6 +99,12 @@ class Scheduler:
         cands = [n for n in self.tree.nodes.values() if self.expandable(n)]
         if not cands:
             return None
+        # a human may pin the next expansions to one node (`rsi continue --from n004`)
+        focus = self.tree.meta.get("focus")
+        if focus:
+            fn = self.tree.nodes.get(focus)
+            if fn is not None and self.expandable(fn):
+                return fn
         # breadth first at the root: every root candidate is launched before any deeper expansion
         root = self.tree.nodes.get("root")
         if root is not None and root in cands:

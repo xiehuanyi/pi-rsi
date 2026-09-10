@@ -255,7 +255,14 @@ class Orchestrator:
         root = self.tree.get("root")
         final: dict[str, Any] = {"stop_reason": reason, "finished_at": now_iso(), "best": best.id if best else None,
                                  "elapsed_s": round(now_ts() - self.started_ts, 1)}
-        if best is not None and best.id != "root" and cfg.task.final_seedset:
+        prev = read_json(cfg.dir / "final.json", {}) or {}
+        if best is not None and prev.get("best") == best.id and prev.get("best_commit") == best.commit and "best_final_score" in prev:
+            final.update({k: prev[k] for k in ("best_final_score", "best_final_metrics", "root_final_score") if k in prev})
+            final["best_commit"] = best.commit
+            final["note"] = "final evaluation reused: best node unchanged since the previous finish"
+            self.log("final_eval_reused", node=best.id)
+        elif best is not None and best.id != "root" and cfg.task.final_seedset:
+            final["best_commit"] = best.commit
             wt = cfg.worktrees_dir / best.id
             if wt.exists():
                 try:

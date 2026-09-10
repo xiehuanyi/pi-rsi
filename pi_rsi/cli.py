@@ -123,6 +123,55 @@ def cmd_relabel(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_continue(a: argparse.Namespace) -> int:
+    """Extend a finished (or stopped) experiment: raise budgets, reset the stall counter, optionally pin the next
+    expansions to one node and leave a note for the workers and planners. Then `rsi run` (or --run)."""
+    import re
+    from .tree import Tree
+    from .util import now_iso, append_jsonl
+    exp = _exp(a.dir)
+    cfg = load_experiment(exp)
+    toml_path = exp / "rsi.toml"
+    text = toml_path.read_text(encoding="utf-8")
+
+    def set_key(section: str, key: str, value):
+        nonlocal text
+        pat = re.compile(rf"(\[{section}\][^\[]*?^{key}\s*=\s*)([^\n]*)$", re.S | re.M)
+        if pat.search(text):
+            text = pat.sub(lambda m: m.group(1) + repr(value), text, count=1)
+        else:
+            text = text.replace(f"[{section}]\n", f"[{section}]\n{key} = {value!r}\n", 1)
+
+    if a.max_nodes:
+        new = cfg.search.max_nodes + int(a.max_nodes[1:]) if a.max_nodes.startswith("+") else int(a.max_nodes)
+        set_key("search", "max_nodes", new)
+    if a.patience is not None:
+        set_key("search", "patience", int(a.patience))
+    if a.max_wallclock is not None:
+        set_key("search", "max_wallclock_s", int(a.max_wallclock))
+    if a.depth is not None:
+        set_key("search", "depth", int(a.depth))
+    if a.width is not None:
+        set_key("search", "width", int(a.width))
+    toml_path.write_text(text, encoding="utf-8")
+    tree = Tree.load(cfg.tree_path)
+    tree.meta["continue_from"] = now_iso()
+    tree.meta["focus"] = a.from_node or None
+    tree.save()
+    if a.note:
+        with open(exp / "HUMAN.md", "a", encoding="utf-8") as f:
+            f.write(f"\n[{now_iso()}] {a.note}\n")
+    append_jsonl(cfg.events_path, {"t": now_iso(), "event": "continued", "max_nodes": a.max_nodes, "patience": a.patience,
+                                   "focus": a.from_node, "note": a.note})
+    cfg = load_experiment(exp)
+    print(f"continue: max_nodes={cfg.search.max_nodes} patience={cfg.search.patience} depth={cfg.search.depth} width={cfg.search.width} "
+          f"focus={a.from_node or '-'}; stall counter reset")
+    if a.run:
+        return cmd_run(argparse.Namespace(dir=str(exp), quiet=a.quiet))
+    print(f"now: rsi run {exp}")
+    return 0
+
+
 def cmd_reeval(a: argparse.Namespace) -> int:
     """Re-run the official evaluator on the root and every done node (e.g. after an evaluator fix); scores are
     expected to be unchanged for deterministic pipelines, metrics files gain any new fields (per_item)."""
@@ -255,6 +304,19 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    c = sub.add_parser("continue", help="extend a finished experiment: more nodes, reset stall counter, optional focus node and note")
+    c.add_argument("dir")
+    c.add_argument("--max-nodes", help="new total, or +N to add")
+    c.add_argument("--patience", type=int)
+    c.add_argument("--max-wallclock", type=int)
+    c.add_argument("--depth", type=int)
+    c.add_argument("--width", type=int)
+    c.add_argument("--from", dest="from_node", help="node id whose subtree gets the next expansions")
+    c.add_argument("--note", help="a note for the workers and planners (appended to <exp>/HUMAN.md)")
+    c.add_argument("--run", action="store_true", help="run immediately")
+    c.add_argument("--quiet", action="store_true")
+    c.set_defaults(fn=cmd_continue)
 
     re_ = sub.add_parser("reeval", help="re-run the official evaluator on root and all done nodes")
     re_.add_argument("dir")

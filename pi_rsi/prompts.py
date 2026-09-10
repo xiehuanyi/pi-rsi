@@ -56,7 +56,7 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
     if node.advice:
         advice_block = f"\n# Advice from the failure diagnoser (this is a retry, attempt {node.attempt})\n{node.advice}\n"
     human_block = ""
-    hn = read_text(node_dir(cfg, node.id) / "HUMAN.md").strip()
+    hn = "\n\n".join(t for t in (read_text(cfg.dir / "HUMAN.md").strip(), read_text(node_dir(cfg, node.id) / "HUMAN.md").strip()) if t)
     if hn:
         human_block = f"\n# Note from the human reviewer\n{hn}\n"
     prop = node.worker.get("proposal", {}) if node.worker else {}
@@ -96,7 +96,9 @@ def planner_root_prompt(cfg: ExperimentCfg, tree: Tree, k: int) -> str:
     docs = ""
     for d in cfg.task.docs:
         docs += f"\n### {d}\n{read_text(cfg.task_dir / d)[:12000]}\n"
-    return render("planner_root", k=k, minutes=cfg.runner.node_timeout_s // 60, task_brief=task_brief(cfg),
+    human = read_text(cfg.dir / "HUMAN.md").strip()
+    brief = task_brief(cfg) + (f"\n\n# Note from the human reviewer\n{human}\n" if human else "")
+    return render("planner_root", k=k, minutes=cfg.runner.node_timeout_s // 60, task_brief=brief,
                   root_score=fmt_score(root.score), score_key=cfg.task.score_key, direction=direction(cfg),
                   root_metrics=json.dumps({k: v for k, v in root.metrics.items() if not k.startswith("_") and k != "per_seed"}, indent=1)[:2000],
                   starter_code=starter or "(no starter code found)", docs_excerpt=docs or "(no docs)")
@@ -108,7 +110,9 @@ def planner_child_prompt(cfg: ExperimentCfg, tree: Tree, parent: Node, k: int) -
     sib = []
     for c in tree.children(parent.id):
         sib.append(f"- `{c.id}` [{c.status}/{c.verdict or '-'}] score {fmt_score(c.score)}: {c.title} — {c.summary[:300]}")
-    return render("planner_child", k=k, minutes=cfg.runner.node_timeout_s // 60, task_brief=task_brief(cfg),
+    human = read_text(cfg.dir / "HUMAN.md").strip()
+    brief = task_brief(cfg) + (f"\n\n# Note from the human reviewer\n{human}\n" if human else "")
+    return render("planner_child", k=k, minutes=cfg.runner.node_timeout_s // 60, task_brief=brief,
                   parent_id=parent.id, parent_score=fmt_score(parent.score), best_score=fmt_score(best.score if best else None),
                   root_score=fmt_score(root.score),
                   parent_handoff=read_text(node_dir(cfg, parent.id) / "HANDOFF.md", parent.summary or "(no handoff)"),
