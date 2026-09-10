@@ -1,0 +1,32 @@
+name = "arc-agi-2"
+
+[task]
+brief = "TASK.md"
+docs = ["docs/ARC.md", "docs/HARDWARE.md"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+
+[eval]
+eval_command = ""
+worker_eval_command = ""
+worker_val_command = ""
+seedsets = ["smoke", "proxy", "full"]
+official_seedset = "proxy"
+final_seedset = "full"
+final_eval_root = false
+quick_seedset = "smoke"
+eval_timeout_s = 16000
+higher_is_better = true
+score_key = "score"
+reference_scores = { arc_prize_2025_top_kaggle = 0.24, arc_prize_2025_frontier_llm_best = 0.30 }
+job_enabled = true
+job_command = "{python} eval/run.py --budget {budget} --run-dir {run_dir} {resume_flag}"
+job_gpus = 1
+job_budgets = { smoke = 240, proxy = 1800, full = 7200 }
+job_timeout_s = 15000
+job_stall_s = 1800
+job_resumable = true
+job_early_stop = {}
+final_top_k = 2
+link_dirs = ["data", "models"]

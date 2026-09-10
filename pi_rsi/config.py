@@ -91,6 +91,7 @@ class TaskCfg:
     job_resumable: bool = False
     job_early_stop: dict[str, Any] = field(default_factory=dict)  # {warmup_frac, margin, patience_points}
     final_top_k: int = 1          # how many top nodes get the final (full) evaluation
+    link_dirs: list[str] = field(default_factory=list)   # task-pack dirs symlinked into every repo/worktree (data, models)
 
 
 @dataclass

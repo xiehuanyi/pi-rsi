@@ -30,6 +30,8 @@ def run_node(orch, node: Node) -> None:
     t0 = time.time()
     try:
         gitops.add_worktree(cfg.repo_dir, worktree, branch, base)
+        from .orchestrator import link_task_dirs
+        link_task_dirs(cfg, worktree)
         tree.update(node, status="running", started_at=now_iso(), branch=branch, base_commit=base,
                     worker={**node.worker, "kind": cfg.runner.kind, "model": cfg.runner.model, "effort": cfg.runner.effort})
         atomic_write_text(nd / "HYPOTHESIS.md", f"# {node.title}\n\n{node.hypothesis}\n\n"
@@ -56,7 +58,7 @@ def run_node(orch, node: Node) -> None:
         usage = dict(res.usage)
         cost = res.cost_usd
         worker_info = {**node.worker, "session_id": res.session_id, "runner_ok": res.ok, "runner_error": res.error,
-                       "turns": res.num_turns, "tool_calls": res.tool_calls}
+                       "turns": res.num_turns, "tool_calls": res.tool_calls, "privacy_flag": _privacy_flag(nd / "runner.jsonl")}
 
         # 2. commit whatever is there ---------------------------------------
         commit = gitops.commit_all(worktree, f"rsi: end of node {node.id} (auto-commit)") or gitops.head(worktree)
@@ -201,3 +203,22 @@ def _analysis_session(orch, node: Node, nd: Path, worktree: Path, session_id: st
                                         timeout_s=900, idle_timeout_s=300)
     orch.add_cost("worker", r)
     orch.log("analysis_end", node=node.id, ok=r.ok, error=r.error, duration_s=round(r.duration_s, 1))
+
+
+def _privacy_flag(log_path: Path) -> str:
+    """Flag tool calls that touch a private/ directory (hidden labels). Reads only tool inputs, not outputs."""
+    hits = []
+    try:
+        for line in open(log_path, encoding="utf-8", errors="replace"):
+            if '"tool_call"' not in line and '"tool_execution_start"' not in line:
+                continue
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            raw = json.dumps(d.get("rawInput") or d.get("args") or {})
+            if "private/" in raw or "/private" in raw:
+                hits.append(raw[:160])
+    except FileNotFoundError:
+        pass
+    return "; ".join(hits[:3])

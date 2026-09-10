@@ -139,7 +139,9 @@ def auditor_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, metrics: dict, gi
                   score_key=cfg.task.score_key, direction=direction(cfg), official_seedset=cfg.task.official_seedset,
                   title=node.title, hypothesis=node.hypothesis, metrics=json.dumps(m, indent=1)[:4000],
                   handoff=read_text(nd / "HANDOFF.md", "(no handoff written)")[:8000],
-                  progress=tail_text(nd / "PROGRESS.md", 120, 8000) or "(no progress log)", gitlog=gitlog, diffstat=diffstat)
+                  progress=tail_text(nd / "PROGRESS.md", 120, 8000) or "(no progress log)",
+                  gitlog=gitlog + (("\n\nPRIVACY FLAG: the worker's tool calls touched a private/ path: " + node.worker.get("privacy_flag")) if node.worker.get("privacy_flag") else ""),
+                  diffstat=diffstat)
 
 
 def diagnoser_prompt(cfg: ExperimentCfg, node: Node, failure: str, runner_tail: str, gitstatus: str) -> str:

@@ -367,7 +367,17 @@ def _populate_repo(cfg: ExperimentCfg) -> None:
         shutil.copy2(brief, repo / "TASK.md")
     gi = repo / ".gitignore"
     if not gi.exists():
-        gi.write_text("__pycache__/\n*.pyc\nmetrics*.json\n*.log\n.venv/\n", encoding="utf-8")
+        gi.write_text("__pycache__/\n*.pyc\nmetrics*.json\n*.log\n.venv/\nruns/\n" + "".join(f"/{d}\n" for d in cfg.task.link_dirs), encoding="utf-8")
+    link_task_dirs(cfg, repo)
+
+
+def link_task_dirs(cfg: ExperimentCfg, root: Path) -> None:
+    """Symlink large read-only task-pack directories (data, models) into a repo or worktree."""
+    for d in cfg.task.link_dirs:
+        src = cfg.task_dir / d
+        dst = root / d
+        if src.exists() and not dst.exists():
+            dst.symlink_to(src, target_is_directory=True)
 
 
 def _write_report(o: Orchestrator, final: dict[str, Any]) -> None:

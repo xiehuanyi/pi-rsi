@@ -1,0 +1,12 @@
+# Starter configuration (read by src/solver.py). Paths are relative to the worktree root.
+model = "models/Qwen2.5-0.5B-Instruct"
+max_train_tokens = 4096      # training sequences longer than this are skipped
+max_prompt_tokens = 6000     # inference prompts are trimmed (context pairs dropped) to fit
+max_new_tokens = 1000
+lora_r = 16
+lora_alpha = 32
+lr = 2e-4
+grad_accum = 8
+augment = true               # random rotation/flip/color permutation of training examples
+seed = 0
+gen_batch_tokens = 20000     # token budget per generation batch (prompt + new tokens, summed)
