@@ -6,3 +6,6 @@ __pycache__/
 tasks/*/.venv/
 *.egg-info/
 .pytest_cache/
+private/
+tasks/*/data/raw/
+tasks/*/starter/data/*.csv

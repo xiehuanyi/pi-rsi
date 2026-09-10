@@ -73,8 +73,19 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
         path_block=_path_block(cfg, tree, node), parent_handoff=parent_handoff,
         insights=read_text(cfg.insights_path, "(none yet)"), deadends=read_text(cfg.deadends_path, "(none yet)"),
         quick_cmd=cfg.task.worker_eval_command.format(seedset=cfg.task.quick_seedset, python=_python(cfg)),
-        val_cmd=cfg.task.worker_eval_command.format(seedset=cfg.task.official_seedset, python=_python(cfg)),
+        val_rule=_val_rule(cfg),
     )
+
+
+def _val_rule(cfg: ExperimentCfg) -> str:
+    cmd = cfg.task.worker_val_command
+    if cmd is None:
+        cmd = cfg.task.worker_eval_command
+    if cmd == "":
+        return (f"The official `{cfg.task.official_seedset}` score is computed on data you cannot see; do not try to find it. "
+                f"Report your quick-set numbers and say they are quick-set numbers.")
+    val_cmd = cmd.format(seedset=cfg.task.official_seedset, python=_python(cfg))
+    return f"Before finishing, run the official seed set once: `{val_cmd}`."
 
 
 def planner_root_prompt(cfg: ExperimentCfg, tree: Tree, k: int) -> str:

@@ -231,9 +231,10 @@ class Orchestrator:
                     m = run_eval(cfg, wt, cfg.task.final_seedset, cfg.nodes_dir / best.id / "eval", tag="final")
                     final["best_final_score"] = score_of(cfg, m)
                     final["best_final_metrics"] = {k: v for k, v in m.items() if k != "per_seed"}
-                    rm = run_eval(cfg, cfg.repo_dir, cfg.task.final_seedset, cfg.nodes_dir / "root" / "eval", tag="final")
-                    final["root_final_score"] = score_of(cfg, rm)
-                    self.log("final_eval_done", best=final["best_final_score"], root=final["root_final_score"])
+                    if cfg.task.final_eval_root:
+                        rm = run_eval(cfg, cfg.repo_dir, cfg.task.final_seedset, cfg.nodes_dir / "root" / "eval", tag="final")
+                        final["root_final_score"] = score_of(cfg, rm)
+                    self.log("final_eval_done", best=final["best_final_score"], root=final.get("root_final_score"))
                 except EvalError as e:
                     final["final_eval_error"] = str(e)
                     self.log("final_eval_failed", error=str(e))

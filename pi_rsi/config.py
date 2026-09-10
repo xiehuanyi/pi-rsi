@@ -52,6 +52,8 @@ class TaskCfg:
     python: str = "python3"      # interpreter used for the evaluator (relative to task dir or absolute)
     eval_command: str = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out}"
     worker_eval_command: str = "python eval/eval.py --seedset {seedset}"
+    worker_val_command: str | None = None   # None -> same command with the official seedset; "" -> hidden (worker cannot run it)
+    final_eval_root: bool = True            # also evaluate the baseline on the final seedset for the report
     seedsets: list[str] = field(default_factory=lambda: ["quick", "validation", "test"])
     official_seedset: str = "validation"
     final_seedset: str = "test"

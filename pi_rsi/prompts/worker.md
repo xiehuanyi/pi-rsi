@@ -32,7 +32,7 @@ $deadends
 # Rules
 1. One hypothesis per node. Do not bundle unrelated changes. If the hypothesis turns out to be impossible or already refuted, say so in the handoff and propose alternatives; do not silently do something else.
 2. Never modify anything under `eval/` or `docs/`. Edits there fail the node.
-3. Iterate with the quick seed set: `$quick_cmd` (writes `metrics.quick.json` in the worktree). Before finishing, run the validation set once: `$val_cmd`. Report only numbers you read from these outputs and say which seed set they come from. Never invent or round-trip numbers from memory.
+3. Iterate with the quick seed set: `$quick_cmd` (writes `metrics.quick.json` in the worktree). $val_rule Report only numbers you read from evaluator outputs and say which seed set they come from. Never invent or round-trip numbers from memory.
 4. Commit with git on the current branch after each meaningful step: `git add -A && git commit -m "<what and why>"`. Uncommitted changes are auto-committed at the end, but your messages are the record.
 5. Keep the code modular and readable: `agent.py` stays the entry point exposing `agent(obs)`; helpers go in `src/`. No file over 400 lines. Prefer small pure functions and explicit constants over magic numbers.
 6. Determinism: the evaluator seeds the environment. Keep the agent deterministic (no unseeded randomness) so scores reproduce.

@@ -1,0 +1,22 @@
+name = "kaggle-house-prices"
+
+[task]
+brief = "TASK.md"
+docs = ["docs/data_description.txt"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+
+[eval]
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --python {python} --quiet"
+worker_eval_command = "{python} eval/eval.py --seedset {seedset} --python {python}"
+worker_val_command = ""
+seedsets = ["quick", "validation", "kaggle"]
+official_seedset = "validation"
+final_seedset = "kaggle"
+final_eval_root = false
+quick_seedset = "quick"
+eval_timeout_s = 2400
+higher_is_better = false
+score_key = "score"
+reference_scores = { solid_public_lb = 0.12 }
