@@ -26,8 +26,10 @@ def cmd_init(a: argparse.Namespace) -> int:
     search = SearchCfg(width_root=a.width_root, width=a.width, depth=a.depth, max_nodes=a.max_nodes,
                        max_parallel=a.parallel, patience=a.patience, target_score=a.target,
                        max_wallclock_s=a.max_wallclock)
+    from .config import HooksCfg
+    hooks = HooksCfg(on_finish=a.on_finish, narrative=not a.no_narrative)
     cfg = ExperimentCfg(name=a.name or exp_dir.name, dir=exp_dir, task=task, runner=runner, utility=utility, search=search,
-                        notes=a.notes or "")
+                        hooks=hooks, notes=a.notes or "")
     exp_dir.mkdir(parents=True, exist_ok=True)
     write_experiment_toml(cfg)
     print(f"initialized {exp_dir}\n" + (exp_dir / "rsi.toml").read_text())
@@ -47,6 +49,53 @@ def cmd_run(a: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, _sig)
     reason = orch.run()
     print(f"finished: {reason}; see {cfg.dir / 'REPORT.md'} and {cfg.dir / 'tree.html'}")
+    return 0
+
+
+def cmd_ops(a: argparse.Namespace) -> int:
+    from .orchestrator import Orchestrator
+    from .ops import run_ops
+    cfg = load_experiment(Path(a.dir))
+    orch = Orchestrator(cfg, verbose=True)
+    evidence = Path(a.evidence).read_text(encoding="utf-8") if a.evidence else ""
+    v = run_ops(orch, a.problem, evidence, max_turns=cfg.ops.max_turns, timeout_s=cfg.ops.timeout_s)
+    print(json.dumps({k: v[k] for k in ("fixed", "retry_failed_nodes", "summary", "dir") if k in v}, indent=1, ensure_ascii=False))
+    return 0 if v.get("fixed") else 1
+
+
+def cmd_write(a: argparse.Namespace) -> int:
+    from .orchestrator import Orchestrator
+    from .ops import write_narrative
+    cfg = load_experiment(Path(a.dir))
+    orch = Orchestrator(cfg, verbose=True)
+    text = write_narrative(orch, a.language or cfg.hooks.narrative_language)
+    print(text[:2000])
+    return 0 if text else 1
+
+
+def cmd_relabel(a: argparse.Namespace) -> int:
+    """Recompute verdicts from official scores with the paired noise estimate (keeps auditor summaries)."""
+    from .orchestrator import Orchestrator
+    cfg = load_experiment(Path(a.dir))
+    orch = Orchestrator(cfg, verbose=False)
+    tree = orch.tree
+    changed = 0
+    for n in tree.non_root():
+        if n.status != "done" or n.score is None or not n.parent:
+            continue
+        parent = tree.get(n.parent)
+        m1 = read_json(cfg.nodes_dir / n.id / "eval" / f"metrics.{cfg.task.official_seedset}.json") or n.metrics
+        m2 = read_json(cfg.nodes_dir / parent.id / "eval" / f"metrics.{cfg.task.official_seedset}.json") or parent.metrics
+        noise = orch.noise_level(m1, m2)
+        d = (n.score - parent.score) if cfg.task.higher_is_better else (parent.score - n.score)
+        verdict = "improved" if d > noise else ("worse" if d < -noise else "no_change")
+        if verdict != n.verdict:
+            changed += 1
+            print(f"{n.id}: {n.verdict} -> {verdict} (delta {d:+.5g}, noise {noise:.4g})")
+            audit = dict(n.audit or {}); audit["verdict"] = verdict; audit["relabel_note"] = f"paired noise {noise:.4g}"
+            tree.update(n, verdict=verdict, audit=audit)
+    orch.render()
+    print(f"relabeled {changed} nodes")
     return 0
 
 
@@ -113,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--target", type=float, default=None)
     i.add_argument("--max-wallclock", type=int, default=None)
     i.add_argument("--notes", default="")
+    i.add_argument("--on-finish", default="", help="shell command run after the final report; {exp_dir} is substituted")
+    i.add_argument("--no-narrative", action="store_true")
     i.add_argument("--force", action="store_true")
     i.set_defaults(fn=cmd_init)
 
@@ -135,6 +186,21 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--seedset")
     e.add_argument("--out")
     e.set_defaults(fn=cmd_eval)
+
+    o = sub.add_parser("ops", help="run the ops (logistics) agent on a problem")
+    o.add_argument("dir")
+    o.add_argument("problem")
+    o.add_argument("--evidence", help="file with logs to include")
+    o.set_defaults(fn=cmd_ops)
+
+    rl = sub.add_parser("relabel", help="recompute improved/worse/no_change verdicts with paired noise")
+    rl.add_argument("dir")
+    rl.set_defaults(fn=cmd_relabel)
+
+    w = sub.add_parser("write", help="write NARRATIVE.md for a finished experiment")
+    w.add_argument("dir")
+    w.add_argument("--language")
+    w.set_defaults(fn=cmd_write)
 
     a = p.parse_args(argv)
     return a.fn(a)

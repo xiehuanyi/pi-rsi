@@ -112,7 +112,8 @@ def run_node(orch, node: Node) -> None:
                  elapsed_s=metrics.get("_eval", {}).get("elapsed_s"))
 
         # 7. audit -------------------------------------------------------------
-        noise = orch.noise_level(metrics, parent.metrics)
+        parent_full = read_json(cfg.nodes_dir / parent.id / "eval" / f"metrics.{cfg.task.official_seedset}.json") or parent.metrics
+        noise = orch.noise_level(metrics, parent_full)
         audit = orch.utility.audit(node, metrics, gitlog, diffstat, noise)
         _record_audit(orch, node, audit, gitlog, diffstat)
         gitops.tag(cfg.repo_dir, f"rsi/{node.id}", commit)

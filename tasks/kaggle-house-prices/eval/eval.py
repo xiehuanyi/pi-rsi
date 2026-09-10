@@ -98,8 +98,10 @@ def main() -> int:
             pred = run_train(agent_dir, a.python, agent_dir / "data" / "train.csv", work / "hold_x.csv", work / "pred.csv", log)
             p, t = aligned(pred, hold)
             per = (np.log1p(np.clip(p, 1, None)) - np.log1p(t)) ** 2
+            ids = hold["Id"].to_numpy()
             metrics.update(score=round(rmsle(p, t), 5), n=len(hold), score_std=round(float(np.std(np.sqrt(per))), 5),
-                           score_sem=round(float(np.std(per) / math.sqrt(len(per)) / (2 * max(rmsle(p, t), 1e-9))), 5))
+                           score_sem=round(float(np.std(per) / math.sqrt(len(per)) / (2 * max(rmsle(p, t), 1e-9))), 5),
+                           per_item=[{"id": int(i), "value": float(v)} for i, v in zip(ids, per)], score_transform="sqrt_mean")
         else:  # kaggle
             hold = pd.read_csv(PRIVATE)
             full = pd.concat([public, hold], ignore_index=True)

@@ -20,8 +20,9 @@ from .render import render_all
 from .runner import make_runner, RunResult
 from .scheduler import Scheduler
 from .tree import Node, Tree
-from .util import append_jsonl, atomic_write_json, now_iso, now_ts, read_json, fmt_score, human_duration, read_text
+from .util import append_jsonl, atomic_write_json, now_iso, now_ts, read_json, fmt_score, human_duration, read_text, tail_text
 from .worker import run_node
+from .ops import run_ops, write_narrative
 
 
 class Orchestrator:
@@ -85,7 +86,11 @@ class Orchestrator:
         atomic_write_json(self.cfg.dir / "state.json", self.state())
 
     def noise_level(self, metrics: dict | None = None, parent_metrics: dict | None = None) -> float:
-        """Two standard errors of the difference between the node and its parent (falls back to 1% of baseline)."""
+        """Two standard errors of the node-vs-parent difference. Paired when both evaluations expose per_item values on
+        the same items (same seeds / same holdout rows); otherwise unpaired from the reported SEMs; else 1% of baseline."""
+        paired = _paired_noise(metrics or {}, parent_metrics or {})
+        if paired is not None:
+            return paired
         sems = []
         for m in (metrics or {}, parent_metrics or {}):
             v = m.get("score_sem")
@@ -181,6 +186,8 @@ class Orchestrator:
                     stop_reason = self.scheduler.stop_reason()
                     if stop_reason:
                         self.log("stop_condition", reason=stop_reason, in_flight=len(futures))
+                if stop_reason is None and not futures:
+                    self.maybe_run_ops()
                 if stop_reason is None:
                     launched = 0
                     while len(futures) < s.max_parallel and self.scheduler.can_launch():
@@ -204,6 +211,31 @@ class Orchestrator:
         self.write_state()
         self.render()
         return stop_reason or "unknown"
+
+    def maybe_run_ops(self) -> None:
+        """Two consecutive evaluator failures with no research cause -> hand the problem to the ops agent once."""
+        if not self.cfg.ops.auto:
+            return
+        recent = self.tree.finished_in_order()[-2:]
+        if len(recent) < 2 or not all(n.status == "failed" and (n.failure or "").startswith("official evaluation failed") for n in recent):
+            return
+        sig = "|".join(sorted(n.id for n in recent))
+        if getattr(self, "_ops_done_for", None) == sig:
+            return
+        self._ops_done_for = sig
+        evidence = ""
+        for n in recent:
+            nd = self.cfg.nodes_dir / n.id
+            evidence += f"\n### node {n.id}: {n.failure}\n"
+            for f in sorted((nd / "eval").glob("*.log")) if (nd / "eval").exists() else []:
+                evidence += f"\n-- {f.name} --\n" + tail_text(f, 60, 6000)
+        verdict = run_ops(self, f"Two consecutive nodes failed in the official evaluator: {recent[-1].failure}", evidence,
+                          max_turns=self.cfg.ops.max_turns, timeout_s=self.cfg.ops.timeout_s)
+        if verdict.get("fixed") and verdict.get("retry_failed_nodes"):
+            for n in recent:
+                d = dict(n.diagnosis or {})
+                d.update(retry=True, advice=(d.get("advice", "") + "\n\nThe evaluator infrastructure was repaired by the ops agent: " + str(verdict.get("summary", ""))))
+                self.tree.update(n, diagnosis=d, attempt=min(n.attempt, self.cfg.search.max_retries))
 
     def _safe_run_node(self, node: Node) -> None:
         try:
@@ -240,7 +272,40 @@ class Orchestrator:
                     self.log("final_eval_failed", error=str(e))
         atomic_write_json(cfg.dir / "final.json", final)
         _write_report(self, final)
+        if cfg.hooks.narrative:
+            try:
+                write_narrative(self, cfg.hooks.narrative_language)
+            except Exception as e:
+                self.log("narrative_failed", error=str(e))
         self.log("finished", reason=reason, best=best.id if best else None, best_score=best.score if best else None)
+        if cfg.hooks.on_finish:
+            cmd = cfg.hooks.on_finish.format(exp_dir=str(cfg.dir))
+            self.log("hook_on_finish", cmd=cmd)
+            try:
+                import subprocess
+                subprocess.run(cmd, shell=True, cwd=str(Path(__file__).resolve().parents[1]), timeout=1800)
+            except Exception as e:
+                self.log("hook_failed", error=str(e))
+
+
+def _paired_noise(m1: dict, m2: dict) -> float | None:
+    a, b = m1.get("per_item"), m2.get("per_item")
+    if not a or not b:
+        return None
+    da = {x["id"]: float(x["value"]) for x in a}
+    db = {x["id"]: float(x["value"]) for x in b}
+    ids = [i for i in da if i in db]
+    if len(ids) < 4:
+        return None
+    diffs = [da[i] - db[i] for i in ids]
+    n = len(diffs)
+    mean = sum(diffs) / n
+    var = sum((d - mean) ** 2 for d in diffs) / (n - 1)
+    sem_mean = (var / n) ** 0.5
+    if m1.get("score_transform") == "sqrt_mean":
+        s = float(m1.get("score") or 0.0)
+        return 2.0 * sem_mean / (2.0 * max(s, 1e-9))
+    return 2.0 * sem_mean
 
 
 def _harness_commit() -> str:

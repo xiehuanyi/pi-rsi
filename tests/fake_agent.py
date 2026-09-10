@@ -32,6 +32,9 @@ if mode == "json":
              "claim_check": {"consistent": True, "note": "fake"}})
     elif "diagnoser" in prompt.lower():
         end({"cause": "fake cause", "retry": True, "advice": "fake advice: write a valid agent"})
+    elif "writer" in prompt.lower():
+        print(json.dumps({"type": "text", "data": "fake narrative paragraph."}))
+        end()
     else:
         end({})
     sys.exit(0)

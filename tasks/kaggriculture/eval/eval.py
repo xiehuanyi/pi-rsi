@@ -153,6 +153,8 @@ def main() -> int:
         "agent_dir": str(agent_dir),
         "git_sha": git_sha(agent_dir),
         "per_seed": results,
+        "per_item": [{"id": f"{r['seed']}-{r['seat']}", "value": r["money"]} for r in results],
+        "score_transform": "mean",
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(metrics, indent=1))

@@ -28,6 +28,23 @@ class UtilityCfg:
 
 
 @dataclass
+class OpsCfg:
+    kind: str = ""               # defaults to the worker runner
+    model: str = ""
+    effort: str = ""
+    auto: bool = True            # call the ops agent after repeated evaluator failures
+    max_turns: int = 40
+    timeout_s: int = 1500
+
+
+@dataclass
+class HooksCfg:
+    on_finish: str = ""          # shell command run after the final report (e.g. publish to the blog); {exp_dir} is substituted
+    narrative: bool = True       # writer pass at the end (NARRATIVE.md)
+    narrative_language: str = "Chinese"
+
+
+@dataclass
 class SearchCfg:
     width_root: int = 3          # candidates generated at the root (breadth-first layer)
     width: int = 2               # max children per non-root node
@@ -72,6 +89,8 @@ class ExperimentCfg:
     runner: RunnerCfg = field(default_factory=RunnerCfg)
     utility: UtilityCfg = field(default_factory=UtilityCfg)
     search: SearchCfg = field(default_factory=SearchCfg)
+    ops: OpsCfg = field(default_factory=OpsCfg)
+    hooks: HooksCfg = field(default_factory=HooksCfg)
     notes: str = ""
 
     # derived paths -------------------------------------------------------
@@ -114,6 +133,8 @@ class ExperimentCfg:
             "runner": dataclasses.asdict(self.runner),
             "utility": dataclasses.asdict(self.utility),
             "search": dataclasses.asdict(self.search),
+            "ops": dataclasses.asdict(self.ops),
+            "hooks": dataclasses.asdict(self.hooks),
         }
         return d
 
@@ -177,5 +198,7 @@ def load_experiment(exp_dir: Path) -> ExperimentCfg:
         runner=_fill(RunnerCfg, raw.get("runner", {})),
         utility=_fill(UtilityCfg, raw.get("utility", {})),
         search=_fill(SearchCfg, raw.get("search", {})),
+        ops=_fill(OpsCfg, raw.get("ops", {})),
+        hooks=_fill(HooksCfg, raw.get("hooks", {})),
         notes=exp.get("notes", ""),
     )
