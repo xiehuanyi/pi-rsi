@@ -47,12 +47,17 @@ def write_narrative(orch, language: str = "Chinese") -> str:
                       best_handoff=read_text(cfg.nodes_dir / (best.id if best else "root") / "HANDOFF.md")[:6000] if best else "(none)")
     log_dir = cfg.nodes_dir / "_utility"
     log_dir.mkdir(parents=True, exist_ok=True)
-    data, res = orch.utility_runner.ask_json(prompt, cwd=cfg.dir, log_path=log_dir / f"writer.{now_iso().replace(':', '')}.jsonl",
-                                             schema=None, timeout_s=cfg.utility.timeout_s)
-    orch.add_cost("utility", res)
-    text = res.final_text.strip() if res.final_text else ""
-    if isinstance(data, dict) and data.get("narrative"):
-        text = str(data["narrative"])
+    text = ""
+    for attempt in range(2):
+        data, res = orch.utility_runner.ask_json(prompt, cwd=cfg.dir, log_path=log_dir / f"writer.{now_iso().replace(':', '')}.jsonl",
+                                                 schema=None, timeout_s=cfg.utility.timeout_s)
+        orch.add_cost("utility", res)
+        text = res.final_text.strip() if res.final_text else ""
+        if isinstance(data, dict) and data.get("narrative"):
+            text = str(data["narrative"])
+        if len(text) >= 300:
+            break
+        prompt += "\n\nYour previous reply was not the narrative. Reply with the full narrative text now (at least 250 words)."
     if text:
         atomic_write_text(cfg.dir / "NARRATIVE.md", text + "\n")
         orch.log("narrative_written", chars=len(text))

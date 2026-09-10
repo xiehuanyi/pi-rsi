@@ -3,6 +3,7 @@ human reader of the experiment page (Markdown, 250-450 words, no headings deeper
 what the task was, what the search tried, which path won and why in terms of the task's mechanics, what did not
 work and why, how far the result is from the references, and the two or three most promising next steps. Every
 number must come from the report below; label worker-reported quick numbers as such. Write in $language.
+Output the narrative text itself and nothing else: no preamble, no plan, no questions, start with the first sentence.
 
 # Report
 $report

@@ -123,6 +123,28 @@ def cmd_relabel(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reeval(a: argparse.Namespace) -> int:
+    """Re-run the official evaluator on the root and every done node (e.g. after an evaluator fix); scores are
+    expected to be unchanged for deterministic pipelines, metrics files gain any new fields (per_item)."""
+    from .evaluator import run_eval, score_of
+    from .orchestrator import Orchestrator
+    cfg = load_experiment(_exp(a.dir))
+    orch = Orchestrator(cfg, verbose=False)
+    tree = orch.tree
+    for n in sorted(tree.nodes.values(), key=lambda n: (n.id != "root", n.id)):
+        if n.status != "done":
+            continue
+        wt = cfg.repo_dir if n.id == "root" else cfg.worktrees_dir / n.id
+        if not wt.exists():
+            print(f"{n.id}: worktree missing, skipped"); continue
+        m = run_eval(cfg, wt, cfg.task.official_seedset, cfg.nodes_dir / n.id / "eval")
+        s = score_of(cfg, m)
+        print(f"{n.id}: {n.score} -> {s}{'' if s == n.score else '  (CHANGED)'}")
+        tree.update(n, score=s, metrics={k: v for k, v in m.items() if k not in ("per_seed", "per_item")})
+    orch.render()
+    return 0
+
+
 def cmd_report(a: argparse.Namespace) -> int:
     from .orchestrator import Orchestrator, _write_report
     cfg = load_experiment(_exp(a.dir))
@@ -233,6 +255,10 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    re_ = sub.add_parser("reeval", help="re-run the official evaluator on root and all done nodes")
+    re_.add_argument("dir")
+    re_.set_defaults(fn=cmd_reeval)
 
     rp = sub.add_parser("report", help="rewrite REPORT.md and re-render from the current tree/final state")
     rp.add_argument("dir")
