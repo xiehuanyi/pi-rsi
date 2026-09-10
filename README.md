@@ -19,35 +19,51 @@ task pack ──► root baseline ──► planner (k hypotheses) ──► wor
 
 | path | what |
 |---|---|
-| `rsi` | CLI launcher: `./rsi init|run|status|render|eval` |
+| `rsi` | CLI launcher for a checkout: `./rsi task|init|run|status|render|eval|ops|write|relabel` |
 | `pi_rsi/orchestrator.py` | the loop: root setup, scheduling, supervision, stop, final report |
 | `pi_rsi/scheduler.py` | best-first parent choice, width/depth caps, retries, stop conditions |
 | `pi_rsi/worker.py` | one node end to end: worktree → session → commit → guard → eval → audit |
 | `pi_rsi/agents.py` | planner / auditor / diagnoser (structured JSON, no tools) |
+| `pi_rsi/ops.py` | logistics agents: ops (tool-using, fixes environments/evaluators) and writer (narrative) |
+| `pi_rsi/home.py` | `RSI_HOME` layout for installed use; bundled task packs live in `pi_rsi/tasks/` |
 | `pi_rsi/runner/` | agent runtimes: `grok` (official Grok CLI), `pi` (pinned pi, JSON mode), `script` (tests) |
 | `pi_rsi/evaluator.py` | runs the task pack's frozen evaluator against a worktree |
 | `pi_rsi/prompts/*.md` | worker, planner, auditor, diagnoser prompt templates |
 | `pi_rsi/render.py` + `templates/tree.html` | self-contained tree visualization, `tree.md`, `REPORT.md` |
-| `tasks/<name>/` | task packs (`task.toml`, `TASK.md`, `starter/`, `eval/`, `docs/`) |
+| `tasks/<name>/` | task packs (`task.toml`, `TASK.md`, `starter/`, `eval/`, `docs/`); symlink to `pi_rsi/tasks/` |
 | `experiments/<name>/` | one directory per run (gitignored): `rsi.toml`, `tree.json`, `nodes/`, `worktrees/`, `repo/` |
 | `tests/` | `test_loop.sh` (LLM-free end-to-end), `test_pi_runner.sh` (pi against a mock provider) |
 | `scripts/supervise.sh` | external watchdog that restarts a dead orchestrator |
+| `scripts/compare.py`, `scripts/publish_blog.py` | cross-experiment comparison; publishing pages to a static blog |
 | `bin/pi`, `package.json` | pinned pi 0.85.1; wrapper disables update checks and telemetry |
+
+## Install
+
+```bash
+uv tool install git+https://github.com/xiehuanyi/pi-rsi      # or: pipx install git+https://github.com/xiehuanyi/pi-rsi
+rsi task list                                                 # bundled task packs
+rsi task install kaggriculture                                # creates ~/.pi-rsi/tasks/kaggriculture with its own venv
+```
+
+Installed this way, experiments live under `~/.pi-rsi/experiments/` (override with `RSI_HOME`). Inside a git checkout,
+`./rsi` uses the checkout's `tasks/` and `experiments/` instead, and the pinned pi from `package.json`
+(`npm install --ignore-scripts`). Agent runtimes are external: the `grok` CLI (logged in), or `pi`
+(`npm i -g @earendil-works/pi-coding-agent@0.85.1`, then `pi` + `/login` or an API key).
 
 ## Quick start
 
 ```bash
-tasks/kaggriculture/setup.sh                                  # once: task venv (kaggle-environments 1.32.7)
-./rsi init experiments/demo --task tasks/kaggriculture --runner grok --model grok-4.6 --effort high \
+rsi init demo --task kaggriculture --runner grok --model grok-4.6 --effort high \
     --utility-model grok-4.5 --utility-effort low --width-root 3 --width 2 --depth 4 --max-nodes 10 --parallel 2
-./rsi run experiments/demo            # resumable; Ctrl-C stops after in-flight nodes finish
-./rsi status experiments/demo
-xdg-open experiments/demo/tree.html   # re-rendered after every event
+rsi run demo               # resumable; Ctrl-C stops after in-flight nodes finish
+rsi status demo
+xdg-open ~/.pi-rsi/experiments/demo/tree.html   # re-rendered after every event
 ```
 
 `rsi run` on an existing experiment resumes it: nodes that were running when the process died are marked failed,
-diagnosed, and retried from their last commit. `scripts/supervise.sh experiments/demo` keeps the loop alive across
-crashes.
+diagnosed, and retried from their last commit. `scripts/supervise.sh <exp dir>` keeps the loop alive across crashes.
+`rsi ops <exp> "<problem>"` hands an infrastructure problem to the logistics agent; `rsi write <exp>` produces a
+human narrative; `rsi relabel <exp>` recomputes verdicts with the paired noise estimate.
 
 ## What a node produces (`experiments/<name>/nodes/<id>/`)
 

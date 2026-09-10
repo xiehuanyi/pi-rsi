@@ -5,9 +5,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pi-rsi"
 version = "0.1.0"
-description = "pi-rsi: an auto-research harness (tree search + handoffs + watchdog) around headless coding agents (pi, grok)."
+description = "Auto-research harness: tree search + handoffs + frozen evaluators around headless coding agents (pi, Grok CLI)."
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = []
+authors = [{ name = "Huanyi Xie" }]
+keywords = ["agents", "research", "harness", "tree-search", "kaggle"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/xiehuanyi/pi-rsi"
+Notes = "https://blog.pocketplay.win/rsi/"
 
 [project.scripts]
 rsi = "pi_rsi.cli:main"
@@ -16,4 +29,11 @@ rsi = "pi_rsi.cli:main"
 include = ["pi_rsi*"]
 
 [tool.setuptools.package-data]
-pi_rsi = ["prompts/*.md", "templates/*.html"]
+pi_rsi = [
+  "prompts/*.md", "templates/*.html", "templates/*.js",
+  "tasks/*/*.toml", "tasks/*/*.md", "tasks/*/*.py", "tasks/*/*.sh", "tasks/*/*.txt",
+  "tasks/*/docs/*", "tasks/*/eval/*", "tasks/*/starter/*", "tasks/*/starter/*/*",
+]
+
+[tool.setuptools.exclude-package-data]
+pi_rsi = ["tasks/*/.venv/*", "tasks/*/data/*", "tasks/*/private/*", "tasks/*/starter/data/*", "tasks/*/starter/__pycache__/*", "tasks/*/*/__pycache__/*"]

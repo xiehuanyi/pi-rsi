@@ -1,0 +1,20 @@
+name = "kaggriculture"
+
+[task]
+brief = "TASK.md"
+docs = ["docs/GETTING_STARTED.md", "docs/RULES.md", "docs/kaggriculture.spec.json"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+
+[eval]
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --quiet"
+worker_eval_command = "{python} eval/eval.py --seedset {seedset}"
+seedsets = ["quick", "validation", "test"]
+official_seedset = "validation"
+final_seedset = "test"
+quick_seedset = "quick"
+eval_timeout_s = 1200
+higher_is_better = true
+score_key = "score"
+reference_scores = { user_v45_tape = 138283.0 }
