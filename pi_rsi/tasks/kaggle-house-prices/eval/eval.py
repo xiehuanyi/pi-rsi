@@ -122,7 +122,7 @@ def main() -> int:
                 q = subprocess.run(["kaggle", "competitions", "submissions", "-c", COMP, "--csv"], capture_output=True, text=True, timeout=120)
                 rows = list(csv_rows(q.stdout))
                 mine = [x for x in rows if x.get("description") == msg]
-                if mine and mine[0].get("status", "").lower() == "complete" and mine[0].get("publicScore"):
+                if mine and "complete" in mine[0].get("status", "").lower() and mine[0].get("publicScore"):
                     score = float(mine[0]["publicScore"])
                     break
             if score is None:

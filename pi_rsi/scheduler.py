@@ -46,10 +46,14 @@ class Scheduler:
         return len([n for n in self.tree.non_root() if n.status != "abandoned"])
 
     def consecutive_without_best(self) -> int:
+        """Consecutive finished nodes (finish order) without a new global best. The root's own candidates (depth 1)
+        are the breadth-first exploration layer and never count: siblings of the best finishing later are not stalls."""
         k = 0
         for n in reversed(self.tree.finished_in_order()):
             if n.status == "done" and n.delta_best is not None and n.delta_best > 0:
                 break
+            if n.depth <= 1:
+                continue
             if n.status in ("done", "failed"):
                 k += 1
         return k

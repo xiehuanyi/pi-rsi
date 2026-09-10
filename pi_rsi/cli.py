@@ -123,6 +123,16 @@ def cmd_relabel(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(a: argparse.Namespace) -> int:
+    from .orchestrator import Orchestrator, _write_report
+    cfg = load_experiment(_exp(a.dir))
+    orch = Orchestrator(cfg, verbose=False)
+    _write_report(orch, read_json(cfg.dir / "final.json", {}) or {})
+    orch.render()
+    print(cfg.dir / "REPORT.md")
+    return 0
+
+
 def cmd_render(a: argparse.Namespace) -> int:
     from .render import render_all
     from .tree import Tree
@@ -223,6 +233,10 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("problem")
     o.add_argument("--evidence", help="file with logs to include")
     o.set_defaults(fn=cmd_ops)
+
+    rp = sub.add_parser("report", help="rewrite REPORT.md and re-render from the current tree/final state")
+    rp.add_argument("dir")
+    rp.set_defaults(fn=cmd_report)
 
     rl = sub.add_parser("relabel", help="recompute improved/worse/no_change verdicts with paired noise")
     rl.add_argument("dir")

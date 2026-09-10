@@ -9,3 +9,4 @@ tasks/*/.venv/
 private/
 tasks/*/data/raw/
 tasks/*/starter/data/*.csv
+pi_rsi/tasks/*/data/raw/
