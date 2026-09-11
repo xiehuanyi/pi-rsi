@@ -1,6 +1,6 @@
 # Hardware and environment
 
-- GPU: one NVIDIA RTX 3090 (24 GB). About 7 GB is permanently used by another process, so plan for ~15 GB.
+- GPU: one NVIDIA RTX 3090 (24 GB), fully available to your jobs (plan for ~22 GB).
   `CUDA_VISIBLE_DEVICES` is set by the job queue; always use device 0 (`.cuda()`).
 - CPU: 52 cores, 250 GB RAM. Disk is plentiful.
 - Python env: `.venv/bin/python` with torch 2.8 (cu128), transformers 5.12, peft 0.19, accelerate, numpy. No flash-attention,

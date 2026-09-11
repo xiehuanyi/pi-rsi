@@ -87,6 +87,17 @@ def run_job_eval(cfg: ExperimentCfg, worktree: Path, level: str, out_dir: Path, 
     t0 = time.time()
     attempts = 2 if cfg.task.job_resumable else 1
     job = None
+    prev_file = out_dir / (name.replace(".json", ".job"))
+    if prev_file.exists():   # a previous harness process submitted this evaluation: reuse or keep waiting
+        try:
+            prev = jobs.Job.load(prev_file.read_text().strip())
+            if prev.status == "running":
+                prev = jobs.wait(prev.id)
+            if prev.status == "done" and (run_dir / "metrics.json").exists():
+                job = prev
+                attempts = 0
+        except FileNotFoundError:
+            pass
     for attempt in range(attempts):
         cmd = job_command(cfg, level, run_dir, resume=attempt > 0)
         es = dict(cfg.task.job_early_stop or {})

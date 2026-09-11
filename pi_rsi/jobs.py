@@ -86,11 +86,16 @@ def submit(cmd: list[str], cwd: Path, **kw: Any) -> Job:
 
 
 def wait(job_id: str, poll_s: float = 5.0, on_progress=None) -> Job:
+    """Block until the job finishes. If the daemon dies meanwhile, a new one is started; it adopts running jobs."""
     last = None
+    checks = 0
     while True:
         job = Job.load(job_id)
         if job.status in ("done", "failed", "killed"):
             return job
+        checks += 1
+        if checks % 6 == 0 and not daemon_alive():
+            ensure_daemon()
         if on_progress and (job.last_step, job.status) != last:
             last = (job.last_step, job.status)
             try:
@@ -196,13 +201,82 @@ def _load_curve(path: Path) -> dict[int, float]:
     return curve
 
 
+def _adopt_orphans(free_gpus: list[int]) -> None:
+    """A restarted daemon settles jobs left in `running` by its predecessor: finished result -> done, dead pid -> failed,
+    live pid -> keep waiting on it (polled by pid; it is not our child)."""
+    for job in list_jobs("running"):
+        alive = False
+        if job.pid:
+            try:
+                os.kill(job.pid, 0)
+                alive = True
+            except OSError:
+                alive = False
+        if alive:
+            print(f"[jobd] adopting live job {job.id} pid {job.pid}", flush=True)
+            for g in job.assigned_gpus:
+                if g in free_gpus:
+                    free_gpus.remove(g)
+            continue
+        if job.result_path and Path(job.result_path).exists():
+            job.status, job.exit_code, job.reason = "done", 0, "adopted: result found after daemon restart"
+        else:
+            job.status, job.reason = "failed", "daemon restarted while the job was running (no result)"
+        job.ended_at = now_iso()
+        if job.started_at and not job.duration_s:
+            try:
+                import datetime as _dt
+                t0 = _dt.datetime.fromisoformat(job.started_at).timestamp()
+                job.duration_s = round(now_ts() - t0, 1)
+            except Exception:
+                pass
+        job.save()
+        print(f"[jobd] settled orphan {job.id}: {job.status} ({job.reason})", flush=True)
+
+
 def run_daemon(gpus: list[int], max_cpu_jobs: int = 2, poll_s: float = 3.0) -> None:
     d = jobs_dir()
     free_gpus = list(gpus)
     running: dict[str, _Running] = {}
     print(f"[jobd] pid {os.getpid()} gpus {gpus} dir {d}", flush=True)
+    _adopt_orphans(free_gpus)
+    adopted = {j.id for j in list_jobs("running")}
     while True:
-        atomic_write_json(d / "jobd.json", {"pid": os.getpid(), "gpus": gpus, "heartbeat": now_ts(), "running": list(running)})
+        try:
+            _daemon_tick(d, gpus, free_gpus, running, adopted, max_cpu_jobs)
+        except Exception as e:  # keep the daemon alive no matter what
+            import traceback
+            print(f"[jobd] tick error: {e}\n{traceback.format_exc()[-1500:]}", flush=True)
+        time.sleep(poll_s)
+
+
+def _daemon_tick(d: Path, gpus: list[int], free_gpus: list[int], running: dict, adopted: set, max_cpu_jobs: int) -> None:
+    if True:
+        atomic_write_json(d / "jobd.json", {"pid": os.getpid(), "gpus": gpus, "heartbeat": now_ts(), "running": list(running) + sorted(adopted)})
+        # adopted jobs (not our children): poll by pid / result file
+        for jid in list(adopted):
+            try:
+                job = Job.load(jid)
+            except FileNotFoundError:
+                adopted.discard(jid)
+                continue
+            alive = False
+            try:
+                os.kill(int(job.pid), 0)
+                alive = True
+            except (OSError, TypeError, ValueError):
+                pass
+            if alive:
+                continue
+            job.status = "done" if (job.result_path and Path(job.result_path).exists()) else "failed"
+            job.reason = job.reason or ("adopted job finished" if job.status == "done" else "adopted job ended without a result")
+            job.ended_at = now_iso()
+            job.save()
+            for g in job.assigned_gpus:
+                if g not in free_gpus and g in gpus:
+                    free_gpus.append(g)
+            adopted.discard(jid)
+            print(f"[jobd] {job.status} {jid} (adopted)", flush=True)
         # reap / monitor
         for jid, r in list(running.items()):
             job = r.job
@@ -256,7 +330,6 @@ def run_daemon(gpus: list[int], max_cpu_jobs: int = 2, poll_s: float = 3.0) -> N
             if job.gpus == 0:
                 cpu_running += 1
             print(f"[jobd] start {job.id} {job.owner} gpus={assigned}", flush=True)
-        time.sleep(poll_s)
 
 
 def _update_progress(job: Job, r: _Running) -> None:

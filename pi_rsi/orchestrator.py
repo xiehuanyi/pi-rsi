@@ -163,10 +163,19 @@ class Orchestrator:
             pass
 
     # main loop ------------------------------------------------------------------
+    def _heartbeat_loop(self) -> None:
+        while not self.stop_flag.is_set() and getattr(self, "_status", "running") != "finished":
+            try:
+                self.write_state()
+            except Exception:
+                pass
+            time.sleep(30)
+
     def run(self) -> str:
         cfg = self.cfg
         self._status = "running"
         self.write_state()
+        threading.Thread(target=self._heartbeat_loop, daemon=True, name="heartbeat").start()
         self.ensure_root()
         self.recover()
         s = cfg.search
