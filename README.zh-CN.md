@@ -1,4 +1,4 @@
-# pi-rsi：围绕编码 Agent 的自动研究框架
+# pi-rsi：自动研究框架
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 

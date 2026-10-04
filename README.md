@@ -1,4 +1,4 @@
-# pi-rsi — auto-research harness (tree search + handoffs around headless coding agents)
+# pi-rsi — auto-research harness
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
