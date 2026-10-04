@@ -1,6 +1,6 @@
 # Airline satisfaction: a real pi-rsi experiment
 
-[中文说明](README.zh-CN.md) · [Compact visualization](index.html) · [Full search explorer](tree.html) · [Snapshot summary](SUMMARY.json)
+[中文说明](README.zh-CN.md) · [Compact visualization](index.html) · [Full search explorer](tree.html) · [Research Wiki](wiki.html) · [Snapshot summary](SUMMARY.json)
 
 This example records a real, sequential search on the supplied S6E10 airline-satisfaction data using one RTX 2080 Ti. GPT-6.1 Sol performed research, implementation and result analysis; GPT-6 Luna maintained the research wiki and handled audits and diagnostics.
 
@@ -41,6 +41,7 @@ n001's model artifact changed after evaluation, so its measurement is invalid an
 |---|---|
 | `index.html` | Self-contained compact chart and clickable search branches |
 | `tree.html` | Self-contained full experiment explorer |
+| `wiki.html`, `wiki-data.json` | Offline claim/evidence browser and published knowledge-revision history |
 | `SUMMARY.json`, `results.json`, `snapshot.json` | Snapshot status, score ledger and explorer data |
 | `metrics/` | Aggregate node metrics with measurement-validity labels |
 | `models/root/`, `models/n016/` | Exact committed baseline and current-best candidate source, with provenance |
@@ -81,6 +82,23 @@ python3 scripts/export_airline_example.py \
 ```
 
 The exporter uses only Python's standard library, reads aggregate results and committed source, and writes the archive outside the live experiment. It launches no agents, jobs or evaluations. It strips machine-local paths and raw execution records, preserves failed nodes, and omits an earlier pilot's stale `final.json` while the continuation is running. It exports the baseline and whichever completed candidate is currently best. Update this narrative and preview after refreshing the data.
+
+## Browse the research Wiki
+
+![Research Wiki claim and evidence browser](wiki-preview.png)
+
+Open `wiki.html` offline. Choose an observation, hypothesis or experience entry to read its statement, recorded status, scope, competing explanations and next test. Supporting and opposing evidence remain separate; selecting a source reveals aggregate experiment metrics or its original documentation URL, with immutable packet hashes. Expand the revision history to inspect actual before/after statuses and recorded revision reasons. The research agenda lists unresolved questions and discriminating experiments.
+
+Wiki statuses are generated, scoped interpretations, not independently verified facts. A supported documentation claim is not experimental confirmation; multiple evidence packets can describe the same experiment or source. The page exports provenance metadata, not full raw evidence packets or private data. It has its own revision timestamp, which can be newer than the experiment snapshot when refreshed separately.
+
+To export the latest published Wiki without running an LLM or evaluation:
+
+```sh
+python3 scripts/export_wiki_view.py \
+  --memory experiments/_memory/airline-s6e10-2080ti/protocols/3809e829ce612de2b66a
+```
+
+Pass `--revision <revision-id>` to pin a historical revision. The experiment exporter automatically pins the Wiki to the revision embedded in its full explorer; the standalone Wiki exporter defaults to `CURRENT.json`. Every exported claim reference is checked against its evidence index, and history follows published revision ancestry rather than treating rejected model drafts as versions.
 
 The recorded sequential research/wiki loop belongs to the current development harness. This example adds the archive and task pack without folding unrelated, pending framework changes into the repository. The candidate CLI and frozen evaluator are supplied independently of those changes.
 

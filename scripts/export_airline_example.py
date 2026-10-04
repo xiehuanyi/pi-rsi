@@ -125,12 +125,14 @@ def main():
     exported = clean(exported).replace(public['experiment'] + ' ·', public['experiment'] + ' · archived snapshot ·', 1)
     (output / 'tree.html').write_text('\n'.join(line.rstrip() for line in exported.splitlines()) + '\n')
     pending = 0
+    selected_memory = None
     knowledge = public.get('knowledge', {})
     for mem in experiment.parent.glob('_memory/airline-s6e10-2080ti/protocols/*'):
-        pointer = read_json(mem / 'CURRENT.json', {})
-        if pointer.get('revision') != knowledge.get('revision'):
+        revision_path = mem / 'revisions' / knowledge.get('revision', '') / 'state.json'
+        if not revision_path.exists():
             continue
-        wiki = read_json(mem / 'revisions' / pointer['revision'] / 'state.json', {})
+        selected_memory = mem
+        wiki = read_json(revision_path, {})
         pending = len({p.stem for p in (mem / 'raw').glob('*.json')} - set(wiki.get('consumed', [])))
     research = [n for n in compact_nodes if n['id'] != 'root']
     active = sum(n['status'] not in ('done', 'failed', 'abandoned') for n in research)
@@ -157,6 +159,9 @@ def main():
                'final_holdout_evaluated': bool(public.get('final', {}).get('best_final_score')),
                'interpretation': 'Adaptive search-validation evidence; repeatability and independent confirmation remain unestablished.'}
     dump(output / 'SUMMARY.json', summary)
+    if selected_memory and (EXAMPLE / 'assets/wiki-shell.html').exists():
+        from export_wiki_view import export_wiki
+        export_wiki(selected_memory, output, knowledge['revision'])
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

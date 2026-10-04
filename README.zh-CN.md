@@ -14,6 +14,7 @@ pi-rsi 将任务说明、基线代码和**冻结评测器**组织成任务包，
 - [English experiment README](examples/airline-s6e10-2080ti-20261004/README.md)
 - [离线可视化](examples/airline-s6e10-2080ti-20261004/index.html)
 - [完整搜索树](examples/airline-s6e10-2080ti-20261004/tree.html)
+- [研究 Wiki：知识、证据和版本变化](examples/airline-s6e10-2080ti-20261004/wiki.html)
 
 ![航空满意度实验的分数与搜索分支](examples/airline-s6e10-2080ti-20261004/preview.png)
 

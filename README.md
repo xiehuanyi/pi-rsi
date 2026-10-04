@@ -9,6 +9,8 @@ Status: v0.1, research prototype. Built and tested on one Linux workstation with
 
 A real RTX 2080 Ti search is archived with an offline chart, the full search explorer, aggregate metrics,
 and exact baseline/current-best source. It is a preliminary snapshot of a continuing campaign.
+The offline [research Wiki](examples/airline-s6e10-2080ti-20261004/wiki.html) links knowledge entries to
+supporting/opposing evidence and published belief revisions.
 Read the [English README](examples/airline-s6e10-2080ti-20261004/README.md) or
 [中文 README](examples/airline-s6e10-2080ti-20261004/README.zh-CN.md).
 
