@@ -1,7 +1,7 @@
 {
-  "revision": "fb8a04195f088e15f4e30f21",
-  "updated_at": "2026-10-04T18:01:07+00:00",
-  "exported_at": "2026-10-04T18:21:17+00:00",
+  "revision": "91ff15aa854e8c5ca38d1bbf",
+  "updated_at": "2026-10-04T18:31:07+00:00",
+  "exported_at": "2026-10-04T18:33:26+00:00",
   "protocol": "3809e829ce612de2b66a",
   "claims": [
     {
@@ -1164,23 +1164,60 @@
       ],
       "next_test": "If testing Depthwise, first verify installed-version GPU feasibility and output compatibility at the proposed settings; then compare a prespecified Depthwise arm with a matched SymmetricTree control. Distinguish parameter feasibility from task-specific ROC-AUC effects, and do not infer child-size guarantees from min_data_in_leaf.",
       "updated_at": "2026-10-04T18:01:07+00:00"
+    },
+    {
+      "id": "n020-depthwise-support100-validation-measurement",
+      "title": "Depthwise with min_data_in_leaf=100 scored 0.9578806 on search validation",
+      "kind": "observation",
+      "status": "supported",
+      "statement": "The designated support100 arm scored ROC-AUC 0.9578806014199407 on 489,744 training rows and 104,945 search-validation rows. It was 0.0000434117 below the historical n016 support1 score, and its whole-candidate time was 6.1853 seconds, within the 180-second cap. This single fixed-seed measurement does not establish stable ordering or a mechanism.",
+      "scope": "Airline satisfaction S6E10; n020 designated Depthwise/min_data_in_leaf=100 arm compared with immutable n016 Depthwise/min_data_in_leaf=1 reference; frozen search validation with 489,744 training and 104,945 scoring rows; 21 raw predictors including four native categories, without ID or target; 400-tree depth-8, L2=10, learning-rate-0.08 GPU Plain CatBoost, seed 20261004, RTX 2080 Ti physical index 1/logical device 0; 180-second cap.",
+      "supports": [
+        "e-38ce7174a007553b49416f26"
+      ],
+      "opposes": [],
+      "alternatives": [
+        "The comparison is sequential against a historical control; GPU variation is unknown.",
+        "Changing the threshold altered realized tree leaf counts and model size as well as the candidate splits, so the score does not isolate a mechanism.",
+        "AUC does not identify effects for particular passenger segments."
+      ],
+      "next_test": "If the support threshold remains decision-relevant, compare support1 and support100 in fresh matched full-pool arms with paired recorded seeds. This distinguishes persistent ordering from sequential-run variation; change the setting only if the prespecified practical rule is met.",
+      "updated_at": "2026-10-04T18:31:07+00:00"
+    },
+    {
+      "id": "n020-support100-practical-improvement",
+      "title": "Support100 did not meet its prespecified practical-improvement threshold",
+      "kind": "hypothesis",
+      "status": "refuted",
+      "statement": "The n020 prediction that changing min_data_in_leaf from 1 to 100 would improve full-pool ROC-AUC by at least 0.0002 over n016 was not met: the observed score was 0.0000434117 lower than n016. This rejects that scoped adoption prediction, not other thresholds or a general mechanism.",
+      "scope": "Airline satisfaction S6E10; n020 designated Depthwise/min_data_in_leaf=100 versus immutable n016 Depthwise/min_data_in_leaf=1 reference; frozen search validation with 489,744 training and 104,945 scoring rows; 21 raw predictors including four native categories, without ID or target; 400-tree depth-8, L2=10, learning-rate-0.08 GPU Plain CatBoost, seed 20261004, RTX 2080 Ti physical index 1/logical device 0; 180-second cap; practical threshold +0.0002.",
+      "supports": [],
+      "opposes": [
+        "e-38ce7174a007553b49416f26"
+      ],
+      "alternatives": [
+        "GPU variation is unquantified and the reference was historical rather than contemporaneous.",
+        "The comparison does not isolate effects of realized tree structure from the support threshold itself."
+      ],
+      "next_test": "Do not adopt support100 for the stated practical-improvement objective on this result. If revisiting the choice, run matched paired-seed support1/support100 evaluations; this distinguishes persistent ordering from run variation and changes the decision only if the practical threshold is met.",
+      "updated_at": "2026-10-04T18:31:07+00:00"
     }
   ],
   "agenda": {
-    "motivation": "Improve ROC-AUC under the frozen airline protocol while distinguishing practical score changes from explanations about passenger interactions. n019's designated joint-feature arm missed the practical adoption threshold; other representations and model families remain open.",
-    "method": "Use predeclared controlled comparisons under the frozen harness, treating quick results as screening and heuristic comparison classifications only as noise diagnostics. The new CatBoost documentation offers parameter semantics for considering a distinct tree-growth branch, not evidence of efficacy or installed-version behavior. Keep the final holdout sealed.",
-    "what_changed": "Added a bounded documentation-based experience: CatBoost describes Depthwise growth and min_data_in_leaf availability on GPU, while clarifying that the threshold restricts split search rather than guaranteeing child sizes. No new task measurement was supplied, so no empirical belief or configuration decision changed; support100 feasibility and any AUC effect remain unknown.",
+    "motivation": "Improve ROC-AUC under the frozen airline protocol while separating measured configuration contrasts from explanations about passenger interactions. The support100 treatment was evaluated, but its prespecified practical gain was not observed.",
+    "method": "Treat the validated full-pool score as one fixed-seed measurement, not a significance result. The packet also reports negative quick comparisons and a repeat, but these do not replace the official full-pool measurement or establish independent-seed evidence. Keep the final holdout sealed.",
+    "what_changed": "Added the n020 support100 search-validation measurement: 0.9578806014199407, 0.0000434117 below n016 support1 and below the +0.0002 adoption threshold. Retired the scoped practical-improvement prediction as refuted; the fixed-seed contrast does not establish equivalence or a mechanism. The evidence packet reports quick support100 results below support1, but no independent-seed inference follows.",
     "open_questions": [
-      "Does the equality-only rating-level arm improve full-pool ROC-AUC over a fresh matched raw control?",
+      "Would matched paired-seed full-pool comparisons preserve the support1/support100 ordering?",
       "Can a controlled learning-rate/iteration trajectory or regularization setting improve practical ROC-AUC within the fixed time cap?",
-      "Is a distinct tree-growth policy feasible in the installed environment and useful under the frozen evaluation protocol?",
-      "Which configuration balances measured AUC and whole-CLI runtime under the frozen cap?"
+      "Can a small GPU-compatible ensemble or principled categorical/ordinal representation improve the frozen validation score?",
+      "Which configuration balances AUC and whole-CLI runtime under the cap?"
     ],
     "next_experiments": [
-      "Run a designated full-pool raw-versus-rating-level comparison with identical settings and frozen seed. This distinguishes equality-only feature utility from the historical raw anchor; retain the views only if the predeclared practical rule is met.",
-      "Compare a prespecified learning-rate/iteration trajectory with a matched fixed-iteration control. This distinguishes trajectory choice from extra compute or tree count; change the configuration only if validation meets the practical rule within the cap.",
-      "If pursuing Depthwise, verify installed-version GPU feasibility first, then evaluate a designated Depthwise treatment against a matched SymmetricTree control. This distinguishes a practical growth-policy alternative from a documentation-only rationale; change the decision only if it runs within budget and meets the practical criterion.",
-      "Do not interpret score changes as evidence of a feature or tree-growth mechanism without an identifying control; use paired recorded-seed comparisons where budget permits and preserve uncertainty when only fixed-seed results are available."
+      "If support threshold selection remains consequential, compare support1 and support100 in matched paired-seed full-pool evaluations. This distinguishes persistent ordering from run variation; change the choice only if the prespecified practical rule is met.",
+      "Compare a prespecified learning-rate/iteration trajectory with a matched fixed-iteration control. This distinguishes trajectory choice from tree count or added compute; change the configuration only if validation meets the practical rule within the cap.",
+      "Test a distinct representation or small GPU-compatible ensemble against a matched raw-feature control. This distinguishes utility of the added modeling choice from sequential-run variation; retain it only if the practical criterion is met within the cap.",
+      "Do not interpret AUC changes as evidence of a passenger-segment mechanism without an identifying control; preserve uncertainty when only fixed-seed comparisons are available."
     ]
   },
   "evidence": [
@@ -1432,6 +1469,31 @@
       "sha256": "003d8806de6268af811551f4b9e55bb10dfe45a77237ad25e59b90acf9ebdd50",
       "packet_sha256": "d0cedda538ef9200674eb34efa22ead5d57132903e99b2a49c8b66446d9692d9",
       "metrics": {}
+    },
+    {
+      "id": "e-38ce7174a007553b49416f26",
+      "kind": "experiment",
+      "title": "Designated Depthwise support100 with fresh support1 control and fixed-seed treatment repeat",
+      "node": "n020",
+      "parent": "n016",
+      "observed_at": "2026-10-04T18:15:56+00:00",
+      "captured_at": "2026-10-04T18:15:58+00:00",
+      "commit": "b9e83b16dc2b3a422fddba7c0b87d05fd9d2285b",
+      "status": "incomplete",
+      "measurement_status": "validated",
+      "selection_eligible": true,
+      "score": 0.9578806014199407,
+      "metric": "score",
+      "level": "validation",
+      "packet_sha256": "2b9bec21b6e1d83ce41e7191736ea0ad98e6f8ae8bfa79c1b573b963bba70b44",
+      "metrics": {
+        "n": 104945,
+        "train_n": 489744,
+        "model_seed": 20261004,
+        "candidate_elapsed_s": 6.802453791722655,
+        "budget_s": 180,
+        "protocol_sha256": "1ad5813ef657601e05e84583cf1d0efe637878028e669beb3fac35bd952b429d"
+      }
     },
     {
       "id": "e-4f93f545b0534311793ebd49",
@@ -2185,6 +2247,36 @@
     }
   ],
   "history": [
+    {
+      "revision": "91ff15aa854e8c5ca38d1bbf",
+      "previous_revision": "fb8a04195f088e15f4e30f21",
+      "updated_at": "2026-10-04T18:31:07+00:00",
+      "claim_count": 60,
+      "counts": {
+        "supported": 41,
+        "untested": 4,
+        "mixed": 7,
+        "refuted": 7,
+        "superseded": 1
+      },
+      "changes": [
+        {
+          "claim": "n020-depthwise-support100-validation-measurement",
+          "before": null,
+          "after": "supported",
+          "reason": "Added the n020 support100 search-validation measurement: 0.9578806014199407, 0.0000434117 below n016 support1 and below the +0.0002 adoption threshold. Retired the scoped practical-improvement prediction as refuted; the fixed-seed contrast does not establish equivalence or a mechanism. The evidence packet reports quick support100 results below support1, but no independent-seed inference follows.",
+          "supersedes": ""
+        },
+        {
+          "claim": "n020-support100-practical-improvement",
+          "before": null,
+          "after": "refuted",
+          "reason": "Added the n020 support100 search-validation measurement: 0.9578806014199407, 0.0000434117 below n016 support1 and below the +0.0002 adoption threshold. Retired the scoped practical-improvement prediction as refuted; the fixed-seed contrast does not establish equivalence or a mechanism. The evidence packet reports quick support100 results below support1, but no independent-seed inference follows.",
+          "supersedes": ""
+        }
+      ],
+      "what_changed": "Added the n020 support100 search-validation measurement: 0.9578806014199407, 0.0000434117 below n016 support1 and below the +0.0002 adoption threshold. Retired the scoped practical-improvement prediction as refuted; the fixed-seed contrast does not establish equivalence or a mechanism. The evidence packet reports quick support100 results below support1, but no independent-seed inference follows."
+    },
     {
       "revision": "fb8a04195f088e15f4e30f21",
       "previous_revision": "5c1a286fdecc30d55d7b2920",
@@ -3350,20 +3442,20 @@
     }
   ],
   "counts": {
-    "supported": 40,
+    "supported": 41,
     "untested": 4,
     "mixed": 7,
-    "refuted": 6,
+    "refuted": 7,
     "superseded": 1
   },
   "kind_counts": {
-    "observation": 24,
+    "observation": 25,
     "experience": 14,
-    "hypothesis": 20
+    "hypothesis": 21
   },
   "evidence_counts": {
     "source": 43,
-    "experiment": 20
+    "experiment": 21
   },
   "provenance_note": "Evidence index contains aggregate metadata and hashes, not raw packets, dataset rows or model-session logs. Multiple entries can describe the same experiment/source."
 }
