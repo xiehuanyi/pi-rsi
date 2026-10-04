@@ -1,9 +1,22 @@
-# pi-rsi — auto-research harness (tree search + handoffs around headless coding agents)
+# pi-rsi — auto-research harness
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 Status: v0.1, research prototype. Built and tested on one Linux workstation with the Grok CLI and a pinned
 [pi](https://github.com/earendil-works/pi) 0.85.1. MIT licensed. Experiment write-ups: https://blog.pocketplay.win/rsi/
+
+## Overview
+
+pi-rsi turns a task pack—problem, starter code and **frozen evaluator**—into a persistent research tree.
+Agents choose and implement hypotheses in isolated Git worktrees; the harness records official measurements,
+audits the result and retains the handoff for the next decision. Budgets, waiting and recovery are controller responsibilities.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pi-rsi-overview-en-dark.svg">
+  <img src="docs/assets/pi-rsi-overview-en-light.svg" alt="pi-rsi research loop: frozen task and baseline, choose a hypothesis, implement and evaluate, review evidence and feed the next decision; inset shows one research node">
+</picture>
+
+The Wiki and task-monitor extensions shown here describe the development research runtime used by the airline example below.
 
 ## Real experiment: airline satisfaction
 
@@ -11,22 +24,13 @@ A real RTX 2080 Ti search is archived with an offline chart, the full search exp
 and exact baseline/current-best source. It is a preliminary snapshot of a continuing campaign.
 The offline [research Wiki](examples/airline-s6e10-2080ti-20261004/wiki.html) links knowledge entries to
 supporting/opposing evidence and published belief revisions.
+Live on the blog: [experiment overview](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/),
+[full search tree](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/),
+[research Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/).
 Read the [English README](examples/airline-s6e10-2080ti-20261004/README.md) or
 [中文 README](examples/airline-s6e10-2080ti-20261004/README.zh-CN.md).
 
 ![Airline experiment score progression](examples/airline-s6e10-2080ti-20261004/preview.png)
-
-pi-rsi runs a long-horizon research loop: it takes a task pack (problem statement, starter code, **frozen evaluator**),
-grows a search tree of hypotheses, and lets a headless coding agent implement one hypothesis per node in its own git
-worktree. Every node ends with a machine-parsed handoff, an official score computed by the harness, and an audited
-summary. Utility agents (planner, auditor, diagnoser) are separated from the workers and run as cheap single-turn
-structured calls. Nothing in the loop keeps an LLM idle: waiting, timeouts, retries, and crash recovery are plain code.
-
-```
-task pack ──► root baseline ──► planner (k hypotheses) ──► worker per node (worktree) ──► official eval ──► auditor
-                                     ▲                                                                       │
-                                     └──────── scheduler: best-first, width/depth/patience caps ◄────────────┘
-```
 
 ## Layout
 

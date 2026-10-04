@@ -8,6 +8,8 @@
 
 ## 打开可视化
 
+也可直接访问博客上的[实验概览](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/)；配套有[中文文章](https://blog.pocketplay.win/zh/blog/pi-rsi-airline-20261004/)和[英文版本](https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/)。
+
 下载或克隆仓库后，用浏览器直接打开 `index.html`。分数曲线、搜索分支、节点详情和 D3 均已包含在页面内，可以离线使用。点击节点查看详情，点击图例显示或隐藏分数系列。`tree.html` 是完整浏览器，包含假设、交接文档、结果分析、审计、失败记录和研究知识，同样可以离线打开。GitHub 文件页显示的是 HTML 源码，不会执行交互页面。
 
 也可以在仓库根目录运行：
@@ -103,3 +105,17 @@ python3 scripts/export_wiki_view.py \
 本轮顺序研究／Wiki 流程来自当前开发版框架。本次仓库更新只加入实验归档和任务包，不会混入其他待整理的框架改动；候选 CLI 和冻结评测器均已单独提供。
 
 项目代码使用 MIT 许可证；内嵌 D3 7.9.0 使用 [ISC 许可证](assets/D3-LICENSE.txt)。
+
+## 发布交互页面
+
+博客构建沿用 PocketPlay Kit v2，将脚本和数据作为同站资源加载，不放宽博客脚本策略，也不在文章 Markdown 中嵌入可执行 HTML。用本目录的聚合归档生成中英文六个页面：
+
+```sh
+python3 scripts/build_blog_visualizations.py \
+  --output work/blog-preview/rsi/interactive/airline-20261004 \
+  --kit /path/to/pocketplay-platform/kit/v2
+```
+
+`scripts/deploy_blog_visualizations.py` 在既有 `pocket` 容器中只安装本静态组件：创建不可变版本，原子切换固定路径的链接，保留私有回滚记录，并在 robots.txt 声明六页站点地图。它不替换平台或旧博客版本，不修改 Nginx 路由、不操作账号，也不调用 LLM。`blog/` 中的文章 JSON 经现有限定发布器发布。要更新快照，先刷新归档，再重新构建；没有自动轮询或新增定时任务。
+
+发布核验：六个线上页面返回 200，节点、证据与历史版本等主要交互均通过；390px、1440px 和明暗主题布局检查通过。浏览器可读取公开数据及站点地图，代表性线上脚本与构建内容一致；中英文章 canonical、入口、RSS 和文章站点地图已核对。研究站点地图通过 robots 声明进入共享总索引。现有 CSP 会拦截 Cloudflare 注入的统计脚本，旧页和新页均有这一提示，不影响本页面交互；本记录不表示 Google 已收录。

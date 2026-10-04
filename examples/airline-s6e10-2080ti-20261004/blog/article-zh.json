@@ -1,0 +1,44 @@
+{
+  "site": "blog",
+  "lang": "zh",
+  "slug": "pi-rsi-airline-20261004",
+  "title": "交互查看 pi-rsi 航空实验与研究 Wiki",
+  "description": "打开分数曲线、搜索分支与知识版本，沿着支持和反对证据阅读；数值最高不等于已独立确认的提升。",
+  "body": "从三个交互入口查看这轮航空满意度研究：[分数曲线与搜索分支](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/)。\n\n## 先看分数，再看实验变化\n\n实验快照的基线 ROC-AUC 为 0.9572004066，已完成且有效的最高分是 n016 的 0.9579240131，差值为 0.0007236065。点击节点可以查看结果与代码继承的分支；失败或失效测量不会提高最佳曲线。\n\nn016 的 Depthwise 配置比单独评测的 SymmetricTree 参考仅高 0.0001394425，低于预设的 0.0002 实用提升标准。数值排名不能证明重复性或统计显著性。最终保留集仍封存；这里是被反复用于选择方案的本地搜索验证分数，不是 Kaggle 榜单成绩。\n\n## 沿着 Wiki 的证据阅读\n\n选择观察、假设或经验条目。支持和反对证据分别展示，点击可看实验分数或文档来源；判断能否用于另一种设置时，再展开适用范围、其他解释和下一步验证。\n\n版本选择器展示已发布条目的前后状态及当时记录的修改原因。“获证据支持”是特定范围内的 Wiki 判断，不等于独立确认；多个记录可能来自同一个实验或来源。\n\n## 看清快照的时间与范围\n\n实验页面和 Wiki 各自标明保存时间，不会自动读取正在运行的研究。导航与控件提供中英文版本，原始实验陈述保留原文。\n\n[快照摘要](https://blog.pocketplay.win/rsi/interactive/airline-20261004/summary.json)、[分数台账](https://blog.pocketplay.win/rsi/interactive/airline-20261004/results.json)、[Wiki 来源记录](https://blog.pocketplay.win/rsi/interactive/airline-20261004/wiki-data.json)和[冻结协议](https://blog.pocketplay.win/rsi/interactive/airline-20261004/protocol.md)记录了页面依据。公开页面只包含聚合记录，不包含数据行、保留集标签、逐行预测或模型会话原始日志。",
+  "sources": [
+    {
+      "title": "Recorded experiment summary",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/summary.json",
+      "checked": "2026-10-04"
+    },
+    {
+      "title": "Published research Wiki provenance and revision history",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/wiki-data.json",
+      "checked": "2026-10-04"
+    },
+    {
+      "title": "Frozen airline evaluation protocol",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/protocol.md",
+      "checked": "2026-10-04"
+    }
+  ],
+  "links": [
+    {
+      "label": "打开实验概览",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/"
+    },
+    {
+      "label": "打开完整搜索树",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/"
+    },
+    {
+      "label": "打开研究 Wiki",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/"
+    }
+  ],
+  "author": "Huanyi Xie",
+  "date": "2026-10-04",
+  "status": "published",
+  "primary_keyword": "pi-rsi 实验可视化",
+  "intent": "交互浏览航空实验、证据与 Wiki 修订，并区分快照、搜索验证与独立确认。"
+}

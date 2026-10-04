@@ -13,3 +13,6 @@ pi_rsi/tasks/*/data/
 pi_rsi/tasks/*/starter/data/*.csv
 pi_rsi/tasks/*/runs/
 pi_rsi/tasks/*/_newtask/
+work/blog-preview/
+work/blog-publish/
+work/architecture-reference/

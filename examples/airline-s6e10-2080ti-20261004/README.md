@@ -8,6 +8,8 @@ This example records a real, sequential search on the supplied S6E10 airline-sat
 
 ## View the experiment
 
+The interactive pages are also published on the blog: [overview](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/), [full search tree](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/), and [research Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/). The [English guide](https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/) has the [Chinese version](https://blog.pocketplay.win/zh/blog/pi-rsi-airline-20261004/).
+
 Download or clone this repository and open `index.html` in a browser. It contains the chart, search branches and node details, including D3, and works offline. Click a node to select it; toggle the legend to show or hide the score series. The expanded `tree.html` also works offline and includes hypotheses, handoffs, analyses, audited results, failure records and research knowledge. GitHub's file view displays the HTML source; it does not run the interactive page.
 
 Alternatively, from the repository root:
@@ -103,3 +105,17 @@ Pass `--revision <revision-id>` to pin a historical revision. The experiment exp
 The recorded sequential research/wiki loop belongs to the current development harness. This example adds the archive and task pack without folding unrelated, pending framework changes into the repository. The candidate CLI and frozen evaluator are supplied independently of those changes.
 
 Project code is MIT licensed. D3 7.9.0 is bundled under its [ISC license](assets/D3-LICENSE.txt).
+
+## Publish the interactive views
+
+The blog build uses PocketPlay Kit v2 and external, same-origin scripts and data. It does not weaken the blog's script policy or embed executable HTML in article Markdown. Build the six English/Chinese pages from this sanitized archive:
+
+```sh
+python3 scripts/build_blog_visualizations.py \
+  --output work/blog-preview/rsi/interactive/airline-20261004 \
+  --kit /path/to/pocketplay-platform/kit/v2
+```
+
+`scripts/deploy_blog_visualizations.py` installs only this static component inside the existing `pocket` container: a new immutable component release, an atomic link for its fixed URL prefix, a private rollback receipt, and a robots.txt declaration for its six-page sitemap. It does not replace the platform or legacy blog release, modify Nginx routing, touch accounts or call an LLM. Article JSON in `blog/` is published through the existing limited editorial publisher. Refresh the archive and build again to update the visual snapshots; no automatic polling or new scheduled job is added.
+
+Publication checks: all six live pages returned 200 and passed the primary node/evidence/revision interactions; 390px and 1440px layouts fit, with light/dark checks. Public data and sitemap files were accessible in the browser; representative live script assets matched the build. English/Chinese article canonicals, links, RSS and the editorial sitemap were checked. The research sitemap was discovered in the shared index from the robots declaration. Existing Cloudflare telemetry injection is blocked by the site's existing CSP on both old and new pages; it did not affect the application interactions. This is not a claim of Google indexing.

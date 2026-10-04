@@ -1,10 +1,19 @@
-# pi-rsi：围绕编码 Agent 的自动研究框架
+# pi-rsi：自动研究框架
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 pi-rsi 将任务说明、基线代码和**冻结评测器**组织成任务包，通过假设搜索树安排实验。每个研究节点在独立 Git worktree 中实现一个假设，交付代码、结果交接和后续提案，再由框架执行正式评测及审计。长期研究记录保存在文件中，支持停止后从原实验目录恢复。
 
 当前为 v0.1 研究原型，主要在一台 Linux 工作站上验证，使用 Grok CLI 或固定版本 pi 0.85.1。项目使用 MIT 许可证。[实验文章](https://blog.pocketplay.win/rsi/)。
+
+## 研究流程
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pi-rsi-overview-zh-dark.svg">
+  <img src="docs/assets/pi-rsi-overview-zh-light.svg" alt="pi-rsi 研究循环：冻结任务与基线，选择假设，实现与正式评测，复盘并保留证据，反馈到下一次决策；下方展开单个研究节点">
+</picture>
+
+图中的 Wiki 和任务监控扩展，对应下方航空案例使用的开发版研究流程。
 
 ## 真实实验：航空满意度
 
@@ -15,6 +24,8 @@ pi-rsi 将任务说明、基线代码和**冻结评测器**组织成任务包，
 - [离线可视化](examples/airline-s6e10-2080ti-20261004/index.html)
 - [完整搜索树](examples/airline-s6e10-2080ti-20261004/tree.html)
 - [研究 Wiki：知识、证据和版本变化](examples/airline-s6e10-2080ti-20261004/wiki.html)
+
+博客交互入口：[实验概览](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/)。
 
 ![航空满意度实验的分数与搜索分支](examples/airline-s6e10-2080ti-20261004/preview.png)
 
