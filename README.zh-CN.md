@@ -16,6 +16,8 @@ pi-rsi 将任务说明、基线代码和**冻结评测器**组织成任务包，
 - [完整搜索树](examples/airline-s6e10-2080ti-20261004/tree.html)
 - [研究 Wiki：知识、证据和版本变化](examples/airline-s6e10-2080ti-20261004/wiki.html)
 
+博客交互入口：[实验概览](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/)。
+
 ![航空满意度实验的分数与搜索分支](examples/airline-s6e10-2080ti-20261004/preview.png)
 
 下载仓库后直接用浏览器打开页面即可，无需 GPU 或登录。归档不是完整断点，不能直接继续原实验；顺序研究和 Wiki 的原始运行来自当前开发版框架，其说明及复现边界写在实验 README 中。

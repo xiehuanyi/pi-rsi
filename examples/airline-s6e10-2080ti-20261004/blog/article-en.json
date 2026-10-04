@@ -1,0 +1,44 @@
+{
+  "site": "blog",
+  "lang": "en",
+  "slug": "pi-rsi-airline-20261004",
+  "title": "Explore pi-rsi airline experiments and their research Wiki",
+  "description": "Open recorded score curves, search branches and knowledge revisions; follow supporting and opposing evidence without treating the highest score as independent confirmation.",
+  "body": "Explore the recorded airline-satisfaction search in three interactive views: [score progression and branches](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/), [the full search tree](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/), and [the research Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/).\n\n## Read the scores\n\nThe experiment snapshot records a baseline ROC-AUC of 0.9572004066 and a highest valid completed score of 0.9579240131 at n016, a difference of 0.0007236065. Click a node to inspect its result and inherited branch. Failed or invalid measurements cannot improve the best-score curve.\n\nThe n016 Depthwise configuration is only 0.0001394425 above the separate SymmetricTree reference, below its prespecified 0.0002 practical screen. Numerical rank does not establish repeatability or statistical significance. The final holdout remains sealed; these are adaptively reused local search-validation scores, not Kaggle leaderboard results.\n\n## Follow a knowledge entry\n\nSelect an observation, hypothesis or experience entry. Follow the separate supporting and opposing records to inspect a recorded experiment score or documentation source. Expand scope, alternatives and the next test before deciding whether a claim applies to another setting.\n\nThe version selector shows published before/after statuses and the recorded reason for a change. “Supported” is a scoped Wiki interpretation, not independent confirmation; multiple records can describe one experiment or source.\n\n## Understand the snapshots\n\nThe experiment and Wiki each display their own saved time. These pages do not poll the running campaign. Original experimental statements remain in their source language, while navigation and controls have English and Chinese versions.\n\nThe [snapshot summary](https://blog.pocketplay.win/rsi/interactive/airline-20261004/summary.json), [score ledger](https://blog.pocketplay.win/rsi/interactive/airline-20261004/results.json), [Wiki provenance](https://blog.pocketplay.win/rsi/interactive/airline-20261004/wiki-data.json) and [frozen protocol](https://blog.pocketplay.win/rsi/interactive/airline-20261004/protocol.md) document what is shown. The public pages contain aggregate records, not dataset rows, held-out labels, prediction tables or model-session transcripts.",
+  "sources": [
+    {
+      "title": "Recorded experiment summary",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/summary.json",
+      "checked": "2026-10-04"
+    },
+    {
+      "title": "Published research Wiki provenance and revision history",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/wiki-data.json",
+      "checked": "2026-10-04"
+    },
+    {
+      "title": "Frozen airline evaluation protocol",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/protocol.md",
+      "checked": "2026-10-04"
+    }
+  ],
+  "links": [
+    {
+      "label": "Open experiment overview",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/"
+    },
+    {
+      "label": "Open full search tree",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/"
+    },
+    {
+      "label": "Open research Wiki",
+      "url": "https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/"
+    }
+  ],
+  "author": "Huanyi Xie",
+  "date": "2026-10-04",
+  "status": "published",
+  "primary_keyword": "pi-rsi experiment visualization",
+  "intent": "Browse recorded airline experiments, evidence and Wiki revisions with clear snapshot and confirmation limits."
+}
