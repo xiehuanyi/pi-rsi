@@ -6,6 +6,15 @@ pi-rsi 将任务说明、基线代码和**冻结评测器**组织成任务包，
 
 当前为 v0.1 研究原型，主要在一台 Linux 工作站上验证，使用 Grok CLI 或固定版本 pi 0.85.1。项目使用 MIT 许可证。[实验文章](https://blog.pocketplay.win/rsi/)。
 
+## 研究流程
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pi-rsi-overview-zh-dark.svg">
+  <img src="docs/assets/pi-rsi-overview-zh-light.svg" alt="pi-rsi 研究循环：冻结任务与基线，选择假设，实现与正式评测，复盘并保留证据，反馈到下一次决策；下方展开单个研究节点">
+</picture>
+
+图中的 Wiki 和任务监控扩展，对应下方航空案例使用的开发版研究流程。
+
 ## 真实实验：航空满意度
 
 仓库包含一轮 RTX 2080 Ti 航空满意度研究的阶段归档：离线可视化、完整搜索树、各节点聚合指标、原始基线和当前最佳方案的源码。当前最佳验证 AUC 为 **0.9579240131**，基线为 **0.9572004066**；稳定提升尚未经过独立重复验证，最终保留集仍封存。
