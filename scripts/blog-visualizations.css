@@ -24,3 +24,9 @@
 .rsi-native h2#title { font-family:var(--font-sans); }
 .rsi-native .skip { display:none; }
 @media(max-width:600px) { .rsi-viz { margin-top:18px; } }
+@media(pointer:coarse) {
+  .rsi-viz .pp-chip, .rsi-tabs .pp-chip { height:40px; min-height:40px; }
+  .rsi-viz .rsi-legend button { min-height:40px; }
+  .rsi-viz .wk-fold summary, .rsi-method summary { min-height:40px; display:flex; align-items:center; }
+  .rsi-viz input, .rsi-viz select { font-size:16px; }
+}
