@@ -1,0 +1,107 @@
+[experiment]
+name = "airline-s6e10-sol61-2080ti-20261004"
+notes = "User authorized pi-rsi only on the local RTX 2080 Ti (physical GPU 1, UUID GPU-2c54fc50-8962-5ef4-a42f-45752aedef9d); RTX 3090 is out of bounds. Research, implementation and results analysis use openai-codex/gpt-6.1-sol high. Wiki, audits, diagnostics, ops and narrative use openai-codex/gpt-6-luna medium. First stage at most 8 sequential expansions and 16 execution attempts. Across any later continuation the absolute campaign limit is 128 expansions excluding root; do not self-extend or change this budget. At most 3 development trials per hypothesis. Freeze train/search/final split and evaluator. Do not read final holdout, submit to Kaggle, upload, launch external research agents or run outside the pi-rsi workflow. Stop with a justified saturation finding rather than forcing all nodes. GPU-hours limit covers queued evaluations; development trial/time caps separately bound worker work."
+
+[task]
+name = "airline-s6e10-2080ti"
+dir = "../../pi_rsi/tasks/airline-s6e10-2080ti"
+brief = "TASK.md"
+docs = ["docs/DATA.md", "docs/PROTOCOL.md", "docs/HARDWARE.md", "docs/BASELINE.json"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --python {python} --quiet"
+worker_eval_command = "{python} eval/eval.py --agent-dir . --seedset {seedset} --out runs/quick/metrics.json --python {python}"
+worker_val_command = ""
+final_eval_root = false
+seedsets = ["quick", "validation", "final"]
+official_seedset = "validation"
+final_seedset = ""
+quick_seedset = "quick"
+eval_timeout_s = 360
+higher_is_better = true
+score_key = "score"
+reference_scores = {starter = 0.9571858140052044, starter_quick = 0.95253733261421}
+job_enabled = true
+job_command = "{python} {task_dir}/eval/run.py --budget {budget} --run-dir {run_dir}"
+job_gpus = 1
+job_budgets = {quick = 60, validation = 180, final = 240}
+job_timeout_s = 360
+job_stall_s = 0
+job_resumable = false
+job_early_stop = {}
+final_top_k = 1
+link_dirs = []
+
+[runner]
+kind = "pi"
+model = "openai-codex/gpt-6.1-sol"
+effort = "high"
+max_turns = 60
+node_timeout_s = 900
+idle_timeout_s = 420
+extra_args = []
+
+[utility]
+kind = "pi"
+model = "openai-codex/gpt-6-luna"
+effort = "medium"
+timeout_s = 600
+
+[search]
+width_root = 3
+width = 3
+depth = 16
+max_nodes = 32
+max_attempts = 64
+max_parallel = 1
+patience = 4
+max_retries = 1
+max_wallclock_s = 57600
+max_gpu_hours = 4.0
+root_eval = true
+
+[ops]
+kind = "pi"
+model = "openai-codex/gpt-6-luna"
+effort = "medium"
+auto = true
+max_turns = 20
+timeout_s = 600
+
+[hooks]
+on_finish = ""
+narrative = true
+narrative_language = "Chinese"
+max_submissions = 0
+
+[memory]
+enabled = true
+path = ""
+protocol_id = ""
+reflect_every = 3
+batch_size = 8
+context_chars = 12000
+research_every = 3
+patience_grace = 2
+
+[research]
+enabled = true
+kind = "pi"
+model = "openai-codex/gpt-6.1-sol"
+effort = "high"
+max_turns = 30
+timeout_s = 600
+idle_timeout_s = 420
+analysis_timeout_s = 600
+candidates = 3
+max_tuning_trials = 3
+max_stage_retries = 1
+context_chars = 40000
+
+[maintainer]
+enabled = true
+kind = "pi"
+model = "openai-codex/gpt-6-luna"
+effort = "medium"
+timeout_s = 600

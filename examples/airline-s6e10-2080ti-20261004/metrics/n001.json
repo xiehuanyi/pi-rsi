@@ -1,0 +1,79 @@
+{
+  "measurement_status": "invalid",
+  "node_status": "failed",
+  "score": null,
+  "recorded_metrics": {
+    "score": 0.9572919178554529,
+    "level": "validation",
+    "uncertainty": "unknown; GPU CatBoost is not bitwise deterministic",
+    "protocol_sha256": "1ad5813ef657601e05e84583cf1d0efe637878028e669beb3fac35bd952b429d",
+    "manifest_sha256": "3a80cfa08413837d6ac81663bedc691b8bc4469301c9a128a2058bbd169f64eb",
+    "budget_s": 180,
+    "model_seed": 20261004,
+    "gpu": {
+      "physical_index": 1,
+      "logical_device": 0,
+      "uuid": "GPU-2c54fc50-8962-5ef4-a42f-45752aedef9d",
+      "name": "NVIDIA GeForce RTX 2080 Ti",
+      "memory_mib": 11264,
+      "driver_version": "595.71.05",
+      "visibility_mask": "1"
+    },
+    "candidate_entry_sha256": "3e0fc91aa59ccefa194d899e97ca995b5d225880fad6e5ef13d651308b1ac8f7",
+    "n": 104945,
+    "train_n": 489744,
+    "data_sha256": {
+      "train": "f4adab750baf57474c0027b20b6dd9c43e4ee188a5b82b1da764459164da4fc3",
+      "prediction_features": "147a522b7ca4c2752716221b9397e55f2f37b52086b7215cab0f4401f3c40b6d",
+      "labels": "b1cd86d2a0ee414730341dad7fb9f603858ffe2edd2a6e0505c730f9a3f2187f"
+    },
+    "candidate_elapsed_s": 5.0471151089295745,
+    "prediction_sha256": "be51474f859aa91aaeed5c9fd2eee186670ecf0da34c0f7177f14593ddc8da8f",
+    "model_sha256": "95681c6aa80812218f72d56ebef116288aef3db927a4812fb5e54a2ffe0e57e7",
+    "candidate_report": {
+      "gpu": {
+        "physical_index": 1,
+        "logical_device": 0,
+        "uuid": "GPU-2c54fc50-8962-5ef4-a42f-45752aedef9d",
+        "name": "NVIDIA GeForce RTX 2080 Ti",
+        "memory_mib": 11264,
+        "driver_version": "595.71.05",
+        "visibility_mask": "1"
+      },
+      "fit_elapsed_s": 2.6394656617194414,
+      "candidate_elapsed_s": 4.448445364832878,
+      "iterations": 400,
+      "seed": 20261004,
+      "depth": 6,
+      "learning_rate": 0.08,
+      "feature_mode": "mean",
+      "feature_names": [
+        "Age",
+        "Flight Distance",
+        "Inflight wifi service",
+        "Departure/Arrival time convenient",
+        "Ease of Online booking",
+        "Gate location",
+        "Food and drink",
+        "Online boarding",
+        "Seat comfort",
+        "Inflight entertainment",
+        "On-board service",
+        "Leg room service",
+        "Baggage handling",
+        "Checkin service",
+        "Cleanliness",
+        "Departure Delay in Minutes",
+        "Arrival Delay in Minutes",
+        "Gender",
+        "Customer Type",
+        "Type of Travel",
+        "Class",
+        "service_mean"
+      ],
+      "train_n": 489744,
+      "predict_n": 104945
+    },
+    "elapsed_s": 5.658876244910061
+  }
+}

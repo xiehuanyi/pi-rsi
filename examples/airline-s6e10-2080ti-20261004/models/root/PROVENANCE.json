@@ -1,0 +1,6 @@
+{
+  "node": "root",
+  "experiment_commit": "520728d47beb2849b60ea7530f66b2234987a893",
+  "official_score": 0.9572004065863107,
+  "source": "Exact committed candidate source; no trained weights or prediction tables."
+}

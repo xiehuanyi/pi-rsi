@@ -1,0 +1,114 @@
+{
+  "protocol": "airline-s6e10-stratified-v1",
+  "seed": 20261004,
+  "target_mapping": {
+    "0": 0,
+    "1": 1
+  },
+  "columns": [
+    "id",
+    "Age",
+    "Flight Distance",
+    "Inflight wifi service",
+    "Departure/Arrival time convenient",
+    "Ease of Online booking",
+    "Gate location",
+    "Food and drink",
+    "Online boarding",
+    "Seat comfort",
+    "Inflight entertainment",
+    "On-board service",
+    "Leg room service",
+    "Baggage handling",
+    "Checkin service",
+    "Cleanliness",
+    "Departure Delay in Minutes",
+    "Arrival Delay in Minutes",
+    "Gender",
+    "Customer Type",
+    "Type of Travel",
+    "Class",
+    "satisfaction"
+  ],
+  "files": {
+    "starter/data/train_pool.csv": {
+      "sha256": "f4adab750baf57474c0027b20b6dd9c43e4ee188a5b82b1da764459164da4fc3",
+      "rows": 489744
+    },
+    "private/train_pool.csv": {
+      "sha256": "f4adab750baf57474c0027b20b6dd9c43e4ee188a5b82b1da764459164da4fc3",
+      "rows": 489744
+    },
+    "starter/data/quick_train.csv": {
+      "sha256": "e88a9d5f7e55c7f592380a2f07aac201ee1378d621bc024ba72e6618cfa07201",
+      "rows": 50000
+    },
+    "starter/data/quick_dev.csv": {
+      "sha256": "5123f032036e2139c95172f156019b48d51d5865021194308765a98ee1875704",
+      "rows": 10000
+    },
+    "private/validation_features.csv": {
+      "sha256": "147a522b7ca4c2752716221b9397e55f2f37b52086b7215cab0f4401f3c40b6d",
+      "rows": 104945
+    },
+    "private/validation_labels.csv": {
+      "sha256": "b1cd86d2a0ee414730341dad7fb9f603858ffe2edd2a6e0505c730f9a3f2187f",
+      "rows": 104945
+    },
+    "private/final_features.csv": {
+      "sha256": "4c464739baf5628d8f4d9e6457bf48b80711fbc3fc8cc9bc90eb70a176bd3007",
+      "rows": 104946
+    },
+    "private/final_labels.csv": {
+      "sha256": "3b008fc689f7fa5bbe5c5f0bed56ffe33b42ec51c74e11302dd07c7b202b4201",
+      "rows": 104946
+    },
+    "starter/data/test.csv": {
+      "sha256": "ff7932747f27c5274de904194ac38b4d088ea4f9bb005ae74f0d619fb893a9b6",
+      "rows": 299844
+    },
+    "starter/data/sample_submission.csv": {
+      "sha256": "6165ecc5769962253534c2d840f26aab55dc3cc091d256bb3641bf6608194a71",
+      "rows": 299844
+    },
+    "data/raw/train.csv": {
+      "sha256": "2313b65c74e6994f01c2628aae82d2f97aa6f74a81950172ff83864837c98b36",
+      "rows": 699635
+    },
+    "data/raw/test.csv": {
+      "sha256": "ff7932747f27c5274de904194ac38b4d088ea4f9bb005ae74f0d619fb893a9b6",
+      "rows": 299844
+    },
+    "data/raw/sample_submission.csv": {
+      "sha256": "6165ecc5769962253534c2d840f26aab55dc3cc091d256bb3641bf6608194a71",
+      "rows": 299844
+    }
+  },
+  "splits": {
+    "train_pool": {
+      "n": 489744,
+      "positive": 217237,
+      "ordered_ids_sha256": "720db2c25cdee9b258804cbe43fd5913ed356978d4fed9dfe2852c3c34a1cef8"
+    },
+    "validation": {
+      "n": 104945,
+      "positive": 46551,
+      "ordered_ids_sha256": "48eb03f28245181dccebabe9888e2dd0158e01fc6086ed6e3b62e1992fcca07e"
+    },
+    "final": {
+      "n": 104946,
+      "positive": 46551,
+      "ordered_ids_sha256": "8b04b3acba8bc0f85bf6f065580ba73e8997c877b611154a9cced83cdd3f5da8"
+    },
+    "quick_train": {
+      "n": 50000,
+      "positive": 22179,
+      "ordered_ids_sha256": "cfe81d354c50d69b392afe90551644b3b951e35ce5e10dfd9568c65832be47d7"
+    },
+    "quick_dev": {
+      "n": 10000,
+      "positive": 4436,
+      "ordered_ids_sha256": "6b5a337d19cff3363c588c38778b2252297cfa1e1ccd42e82b2ca5049f2c97cc"
+    }
+  }
+}
