@@ -14,9 +14,12 @@ import sys
 import xml.etree.ElementTree as ET
 
 REPO = Path(__file__).resolve().parents[1]
+GUIDE = REPO / 'scripts/blog-guide'
 PREFIX = '/rsi/interactive/airline-20261004'
 HOST = 'https://blog.pocketplay.win'
 EN = {
+    '研究搜索树':'Research search tree', '曲线图例':'Chart legend',
+    '支持和反对证据与所选知识条目的关系':'Supporting and opposing evidence for the selected entry',
     'pi-rsi · 航空满意度实验':'pi-rsi · airline satisfaction',
     '验证 AUC 的变化':'Validation AUC progression', '搜索分支':'Search branches',
     '历史最佳':'Best so far', '各节点评测':'Node measurements', '实验运行中':'Running',
@@ -138,6 +141,9 @@ def build_widget(archive, output, name):
     filename = 'dashboard.fragment.html' if name == 'overview' else 'wiki.fragment.html'
     source = (archive / 'assets' / filename).read_text()
     styles = re.findall(r'<style>(.*?)</style>', source, re.S)
+    if name == 'overview':
+        # Widget heading rules must not reach the English article's prose headings inside the same root.
+        styles = [re.sub(r'#pi-rsi-oct04 (h[23])\b', r'#pi-rsi-oct04 > \1', s) for s in styles]
     blocks = re.findall(r'<script\b([^>]*)>(.*?)</script>', source, re.S)
     scripts = [text for attrs, text in blocks if 'application/json' not in attrs]
     if name == 'overview':
@@ -161,6 +167,123 @@ def build_widget(archive, output, name):
     (output / ('assets/' + name + '.css')).write_text('\n'.join(styles + extra_css))
     (output / ('assets/' + name + '.js')).write_text(ui_script(script, name))
     return body
+
+
+# English long-form guide (scripts/blog-guide/*.en.html). The prose quotes this snapshot's numbers, so the
+# build refuses to publish it against a refreshed archive until the text has been reviewed.
+GUIDE_FACTS = {'best': 'n016', 'root': 0.9572004, 'best_score': 0.9579240, 'nodes': 19, 'done': 16, 'failed': 2,
+               'claims': 60, 'evidence': 64, 'revisions': 39,
+               'kinds': {'observation': 25, 'experience': 14, 'hypothesis': 21},
+               'hypotheses': {'supported': 2, 'mixed': 7, 'refuted': 7, 'untested': 4, 'superseded': 1}}
+PATH_NOTES = {
+    'root': 'Untouched starter: 400-tree GPU CatBoost, depth 6, L2 = 3',
+    'n002': 'Add an overall service-rating mean feature',
+    'n004': 'Try 1,600 boosting rounds; keep 400',
+    'n008': 'Deeper, more regularized trees: depth 8, L2 = 10',
+    'n014': 'Drop the mean feature; raw predictors only',
+    'n016': 'Depthwise tree growth, min_data_in_leaf = 1',
+}
+
+
+def check_guide_facts(snapshot, wiki):
+    nodes = {n['id']: n for n in snapshot['nodes']}
+    research = [n for n in snapshot['nodes'] if n['id'] != 'root']
+    claims = wiki['claims']
+    found = {'best': snapshot['best'], 'root': round(snapshot['root_score'], 7),
+             'best_score': round(nodes[snapshot['best']]['score'], 7), 'nodes': len(research),
+             'done': sum(n['status'] == 'done' for n in research), 'failed': sum(n['status'] == 'failed' for n in research),
+             'claims': len(claims), 'evidence': len(wiki['evidence']), 'revisions': len(wiki['history']),
+             'kinds': {k: sum(c['kind'] == k for c in claims) for k in GUIDE_FACTS['kinds']},
+             'hypotheses': {s: sum(c['kind'] == 'hypothesis' and c['status'] == s for c in claims) for s in GUIDE_FACTS['hypotheses']}}
+    stale = {k: (v, found[k]) for k, v in GUIDE_FACTS.items() if found[k] != v}
+    if nodes['n017']['score'] != nodes['n014']['score']:
+        stale['n017 == n014'] = (True, False)
+    if stale:
+        raise SystemExit('English guide prose no longer matches the archive (expected, found): ' + repr(stale))
+
+
+def guide_slots(text, slots):
+    for key, value in slots.items():
+        marker = '<!--@' + key + '-->'
+        if text.count(marker) != 1:
+            raise SystemExit('Guide template needs exactly one ' + marker)
+        text = text.replace(marker, value)
+    return text.replace('{{prefix}}', PREFIX)
+
+
+def overview_parts(body):
+    """Split the compact widget so the English article can place prose between its figures."""
+    m = re.fullmatch(r'\s*<div id="pi-rsi-oct04">\s*<h2>[^<]*</h2>\s*(<div[^>]*id="rsi-snapshot"></div>)\s*<h3>[^<]*</h3>'
+                     r'\s*(.*?)\s*<h3>[^<]*</h3>\s*(.*?)\s*<hr>\s*(<div id="rsi-detail"[^>]*></div>)\s*'
+                     r'(<div id="rsi-tooltip"[^>]*></div>)\s*</div>\s*', body, re.S)
+    if not m:
+        raise SystemExit('Compact widget layout changed; update overview_parts()')
+    return dict(zip(['snapshot', 'chart', 'branches', 'detail', 'tooltip'], m.groups()))
+
+
+def architecture_svg():
+    """Inline both themes of the README artwork so its text uses the page's own font."""
+    out = []
+    for theme in ('light', 'dark'):
+        svg = (REPO / f'docs/assets/pi-rsi-overview-en-{theme}.svg').read_text()
+        p = f'rsi-arch-{theme}-'
+        svg = re.sub(r'\bid="([\w-]+)"', lambda m: f'id="{p}{m[1]}"', svg)
+        svg = svg.replace('url(#', 'url(#' + p).replace('aria-labelledby="title desc"', f'aria-labelledby="{p}title {p}desc"')
+        svg = re.sub(r'font-family="[^"]*"', 'font-family="PP Sans, Inter, system-ui, sans-serif"', svg)
+        out.append(svg.replace('<svg ', f'<svg class="rsi-arch rsi-arch--{theme}" ', 1))
+    return ''.join(out)
+
+
+def path_table(snapshot):
+    nodes = {n['id']: n for n in snapshot['nodes']}
+    path, cur = [], snapshot['best']
+    while cur:
+        path.append(nodes[cur]); cur = nodes[cur]['parent']
+    path.reverse()
+    if [n['id'] for n in path] != list(PATH_NOTES):
+        raise SystemExit('Best path changed; update PATH_NOTES and the guide prose')
+    total = path[-1]['score'] - path[0]['score']
+    rows = []
+    for step, n in enumerate(path):
+        best = n['id'] == snapshot['best']
+        label = 'Baseline' if n['id'] == 'root' else \
+            f'<button type="button" class="rsi-jump" data-jump-node="{n["id"]}">{n["id"]}{" ★" if best else ""}</button>'
+        gain = share = '—'
+        if n['parent']:
+            delta = n['score'] - nodes[n['parent']]['score']
+            fill = 'rsi-bar-fill rsi-bar-fill--key' if delta >= 0.0002 else 'rsi-bar-fill'
+            bar = (f'<svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="rsi-bar-track" width="100" height="8" rx="4"/>'
+                   f'<rect class="{fill}" width="{max(delta / total * 100, 2):.1f}" height="8" rx="4"/></svg>')
+            gain, share = f'{delta:+.7f}', f'<span class="rsi-share">{bar}{delta / total:.0%}</span>'
+        row_class = ' class="rsi-best"' if best else ''
+        rows.append(f'<tr{row_class}><td class="num">{step}</td><td>{label}</td><td>{html.escape(PATH_NOTES[n["id"]])}</td>'
+                    f'<td class="num">{n["score"]:.7f}</td><td class="num">{gain}</td><td>{share}</td></tr>')
+    return ('<table class="pp-table rsi-path"><thead><tr><th scope="col" class="num">Step</th><th scope="col">Node</th>'
+            '<th scope="col">What changed</th><th scope="col" class="num">Validation AUC</th><th scope="col" class="num">Gain over parent</th>'
+            '<th scope="col">Share of total gain</th></tr></thead><tbody>' + ''.join(rows) +
+            f'</tbody><tfoot><tr><td></td><td colspan="3">Baseline to best</td><td class="num">{total:+.7f}</td><td></td></tr></tfoot></table>')
+
+
+def english_guides(snapshot, wiki, bodies):
+    check_guide_facts(snapshot, wiki)
+    node_ids, claim_ids = {n['id'] for n in snapshot['nodes']}, {c['id'] for c in wiki['claims']}
+    guides = {}
+    for name in ('overview', 'tree', 'wiki'):
+        text = (GUIDE / f'{name}.en.html').read_text()
+        missing = set(re.findall(r'data-jump-node="([^"]+)"', text)) - node_ids
+        missing |= {a or b for a, b in re.findall(r'data-jump-claim="([^"]+)"|#claim=([\w-]+)', text)} - claim_ids
+        if missing:
+            raise SystemExit(f'{name}.en.html links to unknown nodes or Wiki entries: {sorted(missing)}')
+        head, body = text.split('<!--@body-->')
+        if name == 'overview':
+            parts = overview_parts(bodies['overview'])
+            body = guide_slots(body, {'snapshot': parts['snapshot'], 'chart': parts['chart'], 'branches': parts['branches'],
+                                      'detail': parts['detail'], 'architecture': architecture_svg(), 'path-table': path_table(snapshot)})
+            body = '<div id="pi-rsi-oct04">' + body + parts['tooltip'] + '</div>'
+        else:
+            body = guide_slots(body, {'widget': bodies[name]})
+        guides[name] = (guide_slots(head, {}), '<div class="rsi-article">' + body + '</div>')
+    return guides
 
 
 def build(archive, output, kit):
@@ -219,6 +342,12 @@ new MutationObserver(translate).observe(root,{childList:true,subtree:true,charac
         shutil.copyfile(archive / src, output / dest)
     shutil.copyfile(REPO / 'pi_rsi/tasks/airline-s6e10-2080ti/docs/PROTOCOL.md', output / 'protocol.md')
     names = {'overview': ('Experiment overview','实验概览'), 'tree': ('Full search tree','完整搜索树'), 'wiki': ('Research Wiki','研究 Wiki')}
+    guides = english_guides(snapshot, wiki, bodies)
+    shutil.copyfile(GUIDE / 'guide.css', output / 'assets/guide.css')
+    shutil.copyfile(GUIDE / 'guide.js', output / 'assets/guide.js')
+    en_meta = {'overview': ('Inside an autonomous research run · pi-rsi', 'How pi-rsi ran 19 agent-designed experiments on airline-satisfaction data, how to read its score curve, search tree and research Wiki, and what stood out.'),
+               'tree': ('The full search tree · pi-rsi', 'Every hypothesis in the pi-rsi airline run, with code ancestry, official scores, audits and a guide to reading them.'),
+               'wiki': ('The research Wiki · pi-rsi', 'Scoped claims from the pi-rsi airline run, the evidence for and against each one, and how its beliefs changed.')}
     urls = []
     for lang in ('en', 'zh'):
         for name in ('overview', 'tree', 'wiki'):
@@ -229,13 +358,19 @@ new MutationObserver(translate).observe(root,{childList:true,subtree:true,charac
             nav = ''.join(f'<a class="pp-chip" href="{PREFIX}/{lang}/{n+"/" if n!="overview" else ""}"' + (' aria-current="page"' if n == name else '') + f'>{names[n][lang=="zh"]}</a>' for n in names)
             article = HOST + f'/{lang}/blog/pi-rsi-airline-20261004/'
             head = f'<header class="pp-container pp-pagehead"><nav class="pp-crumbs"><a href="{article}">{labels("Experiment notes","实验说明")}</a></nav><h1 class="pp-title">pi-rsi · {title}</h1><p class="pp-lede">{labels("Inspect recorded scores, code ancestry and the evidence behind research knowledge.","查看分数、代码分支，以及研究知识背后的证据。")}</p></header>'
-            inner = f'<section class="pp-container pp-section--tight"><nav class="pp-chips rsi-tabs">{nav}</nav><div class="rsi-viz">{bodies[name]}</div><details class="rsi-method"><summary>{labels("Snapshot and interpretation","快照与解释边界")}</summary><p>{labels("Archived data; the page does not poll the running experiment. Search-validation scores and Wiki statuses are not independent confirmation. Original experimental records remain in their source language.","这是保存时的快照，不会自动读取正在运行的实验。搜索验证分数和 Wiki 状态不等于独立确认；原始实验记录保留原文。")}</p><a href="{PREFIX}/summary.json">{labels("Experiment metadata","实验元数据")}</a> · <a href="{PREFIX}/wiki-data.json">{labels("Wiki metadata","Wiki 元数据")}</a> · <a href="{PREFIX}/protocol.md">{labels("Frozen protocol","冻结协议")}</a></details></section>'
+            viz = bodies[name]
+            if lang == 'en':
+                head, viz = guides[name]
+            inner = f'<section class="pp-container pp-section--tight"><nav class="pp-chips rsi-tabs">{nav}</nav><div class="rsi-viz">{viz}</div><details class="rsi-method"><summary>{labels("Snapshot and interpretation","快照与解释边界")}</summary><p>{labels("Archived data; the page does not poll the running experiment. Search-validation scores and Wiki statuses are not independent confirmation. Original experimental records remain in their source language.","这是保存时的快照，不会自动读取正在运行的实验。搜索验证分数和 Wiki 状态不等于独立确认；原始实验记录保留原文。")}</p><a href="{PREFIX}/summary.json">{labels("Experiment metadata","实验元数据")}</a> · <a href="{PREFIX}/wiki-data.json">{labels("Wiki metadata","Wiki 元数据")}</a> · <a href="{PREFIX}/protocol.md">{labels("Frozen protocol","冻结协议")}</a></details></section>'
             assets = PREFIX + '/assets/'
             extra = f'<link rel="stylesheet" href="{assets}viz.css"><link rel="stylesheet" href="{assets}{name}.css">'
             if name == 'overview': extra += f'<script src="{assets}d3.min.js" defer></script>'
             extra += f'<script src="{assets}{name}-data.js" defer></script><script src="{assets}state.js" defer></script><script src="{assets}{name}.js" defer></script>'
-            page = shell.document('blog', lang, 'pi-rsi · ' + title, head + inner,
-                                  labels('Interactive airline experiment and research knowledge snapshots.','航空满意度实验与研究知识的交互快照。'),
+            doc_title, description = 'pi-rsi · ' + title, labels('Interactive airline experiment and research knowledge snapshots.','航空满意度实验与研究知识的交互快照。')
+            if lang == 'en':
+                extra += f'<link rel="stylesheet" href="{assets}guide.css"><script src="{assets}guide.js" defer></script>'
+                doc_title, description = en_meta[name]
+            page = shell.document('blog', lang, doc_title, head + inner, description,
                                   HOST + path, [('en', HOST + path.replace('/zh/', '/en/')), ('zh-CN', HOST + path.replace('/en/', '/zh/'))],
                                   'blog', HOST + alt, extra_head=extra, body_class='rsi-site')
             # Populate widget selectors before Kit enhancement runs.
@@ -243,6 +378,7 @@ new MutationObserver(translate).observe(root,{childList:true,subtree:true,charac
             page = page.replace(pp_script, '').replace('</head>', pp_script + '</head>')
             if lang == 'en':
                 page = re.sub(r'>([^<>]+)<', lambda m: '>' + EN.get(html.unescape(m[1]), m[1]) + '<', page)
+                page = re.sub(r'aria-label="([^"]+)"', lambda m: 'aria-label="' + html.escape(EN.get(html.unescape(m[1]), html.unescape(m[1]))) + '"', page)
             dest = output / lang / (name if name != 'overview' else '') / 'index.html'
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(page)

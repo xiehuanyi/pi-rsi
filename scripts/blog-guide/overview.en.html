@@ -1,0 +1,161 @@
+<header class="pp-container pp-pagehead rsi-hero">
+  <nav class="pp-crumbs"><a href="https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/">Experiment notes</a></nav>
+  <p class="pp-kicker">Research log · pi-rsi</p>
+  <h1 class="rsi-hero__title">Inside an autonomous research run</h1>
+  <p class="rsi-hero__lede">We gave pi-rsi a tabular prediction problem, a frozen evaluator and one RTX&nbsp;2080&nbsp;Ti. Over eight hours its agents proposed, built and tested 19 hypotheses. This page explains how the system works, how to read each view of the run, and what we think is worth noticing.</p>
+  <p class="rsi-hero__meta">October 4, 2026 · Snapshot of a running campaign</p>
+</header>
+<!--@body-->
+<div class="rsi-prose">
+  <aside class="rsi-takeaways" aria-labelledby="rsi-takeaways-title">
+    <h2 id="rsi-takeaways-title">Highlights</h2>
+    <ul>
+      <li><strong>Validation ROC-AUC rose from 0.95720 to 0.95792</strong> (+0.00072) across 19 agent-designed experiments, for about $17 of model usage.</li>
+      <li><strong>One step did most of the work.</strong> Deeper, more strongly regularized trees (n008) contributed +0.00043, about 59% of the total gain.</li>
+      <li><strong>The top scorer did not pass its own test.</strong> n016 beat its parent by 0.00014, short of the +0.0002 bar the agent had set in advance, so the research Wiki records that hypothesis as refuted.</li>
+      <li><strong>A from-scratch rerun matched to sixteen digits.</strong> n017 reproduced n014’s score exactly, a useful check on run-to-run noise for this configuration.</li>
+      <li><strong>Failures stay on the record.</strong> An integrity check voided one score, and a crashed experiment was diagnosed and its repaired version completed.</li>
+    </ul>
+  </aside>
+
+  <h2 id="what-is-pi-rsi">What pi-rsi is</h2>
+  <p>pi-rsi is a harness for doing research with coding agents. You give it a <em>task pack</em>: a problem statement, starter code and a frozen evaluator that the agents can run but never edit. pi-rsi turns that into a persistent tree of experiments, where each node is one hypothesis built on top of an earlier one.</p>
+  <p>Each round has three steps. A research agent <strong>chooses</strong> which existing node to build on and writes a falsifiable hypothesis. A coding agent <strong>implements</strong> it in an isolated Git worktree, iterating on a small development split; then the harness, not the agent, runs the frozen evaluator to produce the node’s official score. Finally a separate model <strong>reviews</strong> the result: it checks the agent’s claims against the official metrics, records insights and dead ends, and updates a research Wiki of scoped claims linked to their evidence. All of this feeds the next choice.</p>
+</div>
+
+<figure class="rsi-figure rsi-figure--arch">
+  <!--@architecture-->
+  <figcaption><b>Figure 1.</b> The pi-rsi loop. The controller owns budgets, official scoring and recovery; the agents own hypotheses, code and interpretation.</figcaption>
+</figure>
+
+<div class="rsi-prose">
+  <p>Two design choices matter for reading everything below. <strong>Scores are never self-reported:</strong> only the harness’s evaluator run counts, and a commit that touches the evaluator fails the node. And <strong>nothing is deleted:</strong> failed, invalid and disappointing nodes stay in the tree with their diagnosis, because a negative result is exactly what the next agent needs to know.</p>
+
+  <h2 id="experiment">The experiment</h2>
+  <p>The task is the airline passenger-satisfaction dataset from Kaggle’s Playground Series (S6E10): predict whether a passenger was satisfied from 21 columns, including age, trip distance, delays, travel type, cabin class and 13 service ratings. The metric is ROC-AUC. The starter code is a 400-tree GPU CatBoost model that already scores 0.9572, so the baseline is strong and every remaining gain is small.</p>
+  <p>The research brief asked the agents to test whether service-rating interactions and passenger-segment features help, using controlled ablations rather than blind hyperparameter search.</p>
+</div>
+
+<div class="rsi-stats">
+  <div><small>Baseline</small><b>0.95720</b><span>untouched starter</span></div>
+  <div><small>Best so far</small><b>0.95792</b><span>n016 · +0.00072</span></div>
+  <div><small>Hypotheses</small><b>19</b><span>16 done · 2 failed · 1 running</span></div>
+  <div><small>Wall time</small><b>8 h 06 m</b><span>one node at a time</span></div>
+  <div><small>Model usage</small><b>≈ $17</b><span>API estimate, excludes GPU</span></div>
+  <div><small>Research Wiki</small><b>60</b><span>entries across 39 revisions</span></div>
+</div>
+
+<div class="rsi-prose">
+  <dl class="rsi-spec">
+    <dt>Data</dt><dd>489,744 training rows, 104,945 search-validation rows and 104,946 sealed holdout rows, from a frozen stratified split (seed 20261004).</dd>
+    <dt>Compute</dt><dd>One RTX 2080 Ti. Each official evaluation is capped at 180 seconds end to end.</dd>
+    <dt>Models</dt><dd>GPT-6.1 Sol (high effort) plans, implements and analyzes. GPT-6 Luna (medium effort) audits results, diagnoses failures and maintains the Wiki.</dd>
+    <dt>Budget</dt><dd>Up to 32 research nodes, run one at a time, with at most three development trials per hypothesis.</dd>
+  </dl>
+  <p>Official scores come from the search-validation split. Because the agents use those scores to decide what to try next, the split is reused adaptively, and the best of many attempts is optimistically biased. That is why the final holdout stays sealed until the whole campaign ends.</p>
+
+  <h2 id="score">How the score moved</h2>
+  <p>Figure 2 is the run at a glance: every experiment’s official score, in the order it finished, against the best score so far.</p>
+</div>
+
+<figure class="rsi-figure" id="rsi-fig-score">
+  <!--@snapshot-->
+  <!--@chart-->
+  <figcaption><b>Figure 2.</b> Official validation ROC-AUC for each research node, in completion order. Hover to read values, click to select a node, and use the legend to show or hide a series.</figcaption>
+</figure>
+
+<div class="rsi-prose">
+  <h3>How to read it</h3>
+  <dl class="rsi-key">
+    <dt><svg viewBox="0 0 32 16" aria-hidden="true"><path class="rsi-k-best" d="M2 12 H13 V5 H30"/></svg></dt>
+    <dd><strong>Best so far.</strong> The incumbent. It steps up only when a completed node with a valid score beats it.</dd>
+    <dt><svg viewBox="0 0 32 16" aria-hidden="true"><circle class="rsi-k-dot" cx="16" cy="8" r="4"/></svg></dt>
+    <dd><strong>Node measurement.</strong> One official score per experiment. A hollow diamond marks a node that was still being processed.</dd>
+    <dt><svg viewBox="0 0 32 16" aria-hidden="true"><path class="rsi-k-base" d="M2 8 H30" stroke-dasharray="3 4"/></svg></dt>
+    <dd><strong>Baseline.</strong> The untouched starter at 0.9572004.</dd>
+    <dt><svg viewBox="0 0 32 16" aria-hidden="true"><path class="rsi-k-cross" d="M12 4 L20 12 M20 4 L12 12"/></svg></dt>
+    <dd><strong>Failed or invalid.</strong> Listed under the axis. These never move the incumbent, even when a stale score exists.</dd>
+  </dl>
+  <p>Mind the vertical scale: the whole chart spans less than 0.001 AUC. Differences that look dramatic here are small in absolute terms, which is why the agent set an explicit practical bar of +0.0002 before calling anything an improvement.</p>
+
+  <h3>What to notice</h3>
+  <ul class="rsi-notice">
+    <li><strong>One big step, several small ones.</strong> The jump at n008, which raised tree depth from 6 to 8 and L2 regularization from 3 to 10, added +0.00043 over its parent. It is the only step on the winning path that cleared the agent’s own bar. <button type="button" class="rsi-jump" data-jump-node="n008">n008</button></li>
+    <li><strong>Most experiments don’t set a new best, by design.</strong> Only 5 of the 16 completed nodes moved the incumbent: n002, n003, n008, n011 and n016. Many of the rest were controls, built to check whether an earlier gain was real.</li>
+    <li><strong>The brief pointed at features; the data pointed at capacity.</strong> Feature ideas such as a rating mean, digital-service gates, a low-rating count and categorical rating views each moved the score by less than 0.0001 against their parents. The clear gain came from model capacity.</li>
+    <li><strong>Progress has stalled since n016.</strong> Its two successors, n017 and n018, scored lower, and n019 was still being evaluated when this snapshot was taken. <button type="button" class="rsi-jump" data-jump-node="n016">n016</button></li>
+  </ul>
+
+  <h2 id="tree">Where each idea came from</h2>
+  <p>The score curve shows <em>when</em> things happened. The search tree shows <em>what built on what</em>.</p>
+</div>
+
+<figure class="rsi-figure" id="rsi-fig-tree">
+  <!--@branches-->
+  <figcaption><b>Figure 3.</b> The search tree. Each node is one hypothesis, and an edge means the child started from its parent’s code. The dark path is the ancestry of the best node. Click a node to read its result below.</figcaption>
+</figure>
+<div class="rsi-selected" aria-label="Selected node">
+  <small>Selected node</small>
+  <!--@detail-->
+</div>
+
+<div class="rsi-prose">
+  <h3>How to read it</h3>
+  <ul>
+    <li><strong>Left to right is depth, not time.</strong> Each column is one more hypothesis stacked on the baseline. A child starts from its parent’s commit and changes one thing.</li>
+    <li><strong>The dark line</strong> is the best node’s ancestry. Faint lines are side branches that were explored and kept.</li>
+    <li><strong>Markers:</strong> ★ highest valid score, × failed or invalid, ◇ still processing at snapshot time.</li>
+    <li><strong>Click any node</strong> to see its title, official score, gain over the baseline and the auditor’s summary. On narrow screens the tree becomes an indented list.</li>
+  </ul>
+
+  <h3>What to notice</h3>
+  <ul class="rsi-notice">
+    <li><strong>The search piles onto a promising node.</strong> Once n008 took the lead, the next six hypotheses (n009–n014) all branched from it: two controls asking <em>why</em> depth 8 helped, a categorical-feature idea, two attempts at averaging restarts, and a simplification. <button type="button" class="rsi-jump" data-jump-node="n008">n008</button></li>
+    <li><strong>The winner came from a simplification, not from the incumbent.</strong> n016 does not descend from n011, the best node at the time. It descends from n014, which removed a hand-made rating-mean feature and scored slightly lower. The simpler model gave the next idea, Depthwise tree growth, a cleaner base. <button type="button" class="rsi-jump" data-jump-node="n014">n014</button> <button type="button" class="rsi-jump" data-jump-node="n016">n016</button></li>
+    <li><strong>Failures are visible, with causes.</strong> n001’s model file changed after it was scored, so the harness voided the result; otherwise it would have been the first improvement over the baseline. n012 crashed on a misspelled CatBoost option and ran out of its trial budget; the diagnoser’s advice informed n013, a repaired version of the same idea, which completed. <button type="button" class="rsi-jump" data-jump-node="n001">n001</button> <button type="button" class="rsi-jump" data-jump-node="n012">n012</button></li>
+  </ul>
+
+  <p>Here is the winning path, step by step.</p>
+</div>
+
+<div class="rsi-tablewrap">
+  <!--@path-table-->
+</div>
+<p class="rsi-tablenote">Only n008 clears the agent’s +0.0002 practical bar. The smaller steps should not be read as improvements on their own.</p>
+
+<div class="rsi-prose">
+  <h2 id="stood-out">What stood out</h2>
+
+  <h3>The agent sets its own bar, and keeps to it</h3>
+  <p>Before each experiment, the research agent writes a prediction with a practical threshold, usually “improves validation AUC by at least 0.0002 over a named control.” The auditor and the Wiki then judge the result against that bar rather than against its rank.</p>
+  <p>This produces a result that looks odd at first: the hypothesis behind the top-scoring node is recorded as <strong>refuted</strong>. n016 did score highest, but its +0.00014 over n014 fell short of the +0.0002 the agent had said it would need to call Depthwise growth a practical improvement. We think this is the right behavior. A leaderboard rewards the luckiest draw; a research log should say whether the idea worked. <a href="{{prefix}}/en/wiki/#claim=n016-depthwise-practical-benefit">Read the Wiki entry →</a></p>
+
+  <h3>Controls, not just attempts</h3>
+  <p>12 of the 19 hypotheses name an explicit control arm in their title, such as “Fresh shallow full-pool control for the depth8 signal” (n009) or “Fresh designated raw SymmetricTree full-pool policy control” (n017). A control rarely raises the score. It tells the next agent whether the last gain is worth building on. n009, for example, rebuilt the depth-6 model fresh and confirmed that depth 8 with L2&nbsp;=&nbsp;10 beat it by 0.00043, one of only two hypotheses the Wiki marks as supported.</p>
+
+  <h3>A rerun that matched to sixteen digits</h3>
+  <p>n017 rebuilt n014’s configuration from scratch as a fresh control for n016. It scored 0.9577845705966306, identical to n014 in every recorded digit. CatBoost’s documentation warns that GPU training can be nondeterministic, and the Wiki keeps that caveat open. But for this configuration on this card, a refit reproduced exactly, so n016’s lead over n014 is a real difference between two models on this validation split. It is not, by itself, evidence that the lead would hold on new data or with another seed.</p>
+
+  <h3>Cheap screens and official scores disagree</h3>
+  <p>Workers iterate on a 50,000-row development split before the official run. At this effect size, those quick screens often pointed the other way. The quick comparison favored depth 6 over depth 8 just before n008’s official result reversed it, and it put Depthwise growth about 0.00014 <em>below</em> n014 just before n016’s official score came in about 0.00014 above. This is a concrete reason the harness, not the worker, owns the official score.</p>
+
+  <h3>A Wiki, not just a leaderboard</h3>
+  <p>By its latest revision the research Wiki holds 60 entries: 25 observations, 14 pieces of practical experience (mostly from library documentation) and 21 hypotheses, linked to 64 evidence records across 39 published revisions. Of the 21 hypotheses, 2 are supported, 7 have mixed evidence, 7 are refuted, 4 are untested and 1 has been superseded. A run that kept only its best score would have thrown most of this away.</p>
+
+  <h2 id="limits">What this run doesn’t show</h2>
+  <ul>
+    <li><strong>No independent confirmation yet.</strong> Every score here is a search-validation score that helped guide 19 decisions, so the best one is optimistically biased. The final holdout is sealed until the campaign ends, and nothing was submitted to Kaggle.</li>
+    <li><strong>One seed per comparison.</strong> General run-to-run variation on the GPU is unquantified, even though one rerun matched exactly.</li>
+    <li><strong>A small absolute gain.</strong> +0.00072 AUC on top of a strong baseline. We find the process, meaning what was tried, controlled and ruled out, more informative than the number.</li>
+    <li><strong>A snapshot, not a finished study.</strong> The tree shows 19 of up to 32 nodes. The Wiki was exported about 45 minutes later, so it already covers n019 and n020, which the figures above do not.</li>
+  </ul>
+
+  <h2 id="explore">Explore the run</h2>
+  <p>The two companion views hold everything this page summarizes, each with its own reading guide.</p>
+</div>
+
+<div class="rsi-cards">
+  <a class="rsi-card" href="{{prefix}}/en/tree/"><b>Full search tree</b><span>Every hypothesis with its code changes, handoff notes, audit and failure diagnosis, plus a searchable ledger of all nodes.</span><em>Open the tree →</em></a>
+  <a class="rsi-card" href="{{prefix}}/en/wiki/"><b>Research Wiki</b><span>What the run has learned: scoped claims, the evidence for and against each one, and how beliefs changed across 39 revisions.</span><em>Open the Wiki →</em></a>
+  <a class="rsi-card" href="https://github.com/xiehuanyi/pi-rsi"><b>Source code</b><span>The pi-rsi harness, the airline task pack with its frozen evaluator, and the archive behind these pages.</span><em>View on GitHub →</em></a>
+</div>

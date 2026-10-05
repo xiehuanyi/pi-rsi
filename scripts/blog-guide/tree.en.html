@@ -1,0 +1,38 @@
+<header class="pp-container pp-pagehead rsi-hero rsi-hero--compact">
+  <nav class="pp-crumbs"><a href="{{prefix}}/en/">Inside an autonomous research run</a></nav>
+  <p class="pp-kicker">Research log · pi-rsi</p>
+  <h1 class="rsi-hero__title">The full search tree</h1>
+  <p class="rsi-hero__lede">Every hypothesis in the run, with its code ancestry, official score, audit and handoff notes, as the harness recorded them.</p>
+</header>
+<!--@body-->
+<div class="rsi-prose">
+  <p>This is pi-rsi’s own explorer for the airline run. It holds far more detail than the <a href="{{prefix}}/en/">overview</a>, which is the better place to start if you want the story first. Below is a short guide to the six panels, then a few nodes worth opening.</p>
+  <h2 id="read">How to read this page</h2>
+</div>
+
+<ol class="rsi-panels">
+  <li><b>Summary strip</b><span>Baseline and best official scores, hypotheses allocated against the 32-node limit, execution attempts including retries, and an estimate of model-API spend. GPU time is not included.</span></li>
+  <li><b>Search tree</b><span>Drag to pan, scroll or use +/− to zoom, and press <em>Best</em> to jump to the top node. Each card shows the official score and the gain over its parent. Card colour is the auditor’s verdict; the gold path is the best node’s ancestry and the dashed path is the selected node’s.</span></li>
+  <li><b>Inspector</b><span>The selected node in depth. <em>Overview</em> has the hypothesis, observed result, recorded code changes and the auditor’s claim check. <em>Handoff</em> is what the worker left for the next agent. <em>Result analysis</em>, <em>Progress</em> and <em>Evidence</em> hold the analyst’s reading, the worker’s running log and the linked Wiki evidence.</span></li>
+  <li><b>Score curve</b><span>The same best-so-far curve as the overview. Switch to <em>By time</em> to see wall-clock pacing, including idle gaps. Crosses mark failed nodes.</span></li>
+  <li><b>Research knowledge</b><span><em>Insights</em> and <em>Dead ends</em> are ledgers in which every line cites the node that produced it. <em>Wiki &amp; revisions</em> shows the Wiki at the revision pinned to this snapshot.</span></li>
+  <li><b>Node ledger</b><span>One row per node: verdict, official score, gain over its parent (green up, red down), elapsed time and parent. Search or filter by status, and click an id to select that node everywhere on the page.</span></li>
+</ol>
+
+<div class="rsi-prose">
+  <aside class="rsi-callout">
+    <h3>Why does almost every node say “no change”?</h3>
+    <p>The auditor labels a node <em>improved</em> only when its gain over its parent exceeds a noise threshold. This evaluator reports a single AUC without per-row uncertainty, so the harness falls back to a deliberately conservative default of 1% of the baseline score, about 0.0096 AUC. No single step in this run comes close. Read “no change” as “not distinguishable under the default rule,” and use the <em>Gain vs parent</em> column together with the agent’s +0.0002 practical bar for finer judgement.</p>
+  </aside>
+
+  <h3>Good places to start</h3>
+  <ul class="rsi-starts">
+    <li><button type="button" class="rsi-jump" data-jump-node="n016">n016 ★</button><span>The best node. Open its <em>Handoff</em> tab to see how the worker described its own below-threshold result.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n008">n008</button><span>The largest single step, depth 8 with L2&nbsp;=&nbsp;10, and the parent of six follow-up hypotheses.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n017">n017</button><span>A fresh control that reproduced n014’s score in every recorded digit.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n001">n001</button><span>A voided measurement: the model file changed after it was scored.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n012">n012</button><span>A crash with a recorded diagnosis. Its repaired follow-up is n013.</span></li>
+  </ul>
+</div>
+
+<!--@widget-->

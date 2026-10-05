@@ -1,0 +1,60 @@
+<header class="pp-container pp-pagehead rsi-hero rsi-hero--compact">
+  <nav class="pp-crumbs"><a href="{{prefix}}/en/">Inside an autonomous research run</a></nav>
+  <p class="pp-kicker">Research log · pi-rsi</p>
+  <h1 class="rsi-hero__title">The research Wiki</h1>
+  <p class="rsi-hero__lede">What the run has learned, written as scoped claims and tied to the evidence for and against each one.</p>
+</header>
+<!--@body-->
+<div class="rsi-prose">
+  <p>The Wiki is the run’s memory. After every node, a maintainer model turns the new evidence into short, scoped claims and publishes a revision. The next research agent reads it before choosing what to try. On this page you can pick any claim, see what supports or opposes it, and follow how the Wiki’s beliefs changed over time.</p>
+
+  <h2 id="read">How to read it</h2>
+  <h3>Three kinds of entry</h3>
+  <dl class="rsi-spec">
+    <dt>Observation</dt><dd>A recorded measurement, stated with its scope. For example, “Depthwise scored 0.9579240 on search validation.”</dd>
+    <dt>Experience</dt><dd>Practical knowledge, often from library documentation, such as CatBoost’s note that GPU training can be nondeterministic.</dd>
+    <dt>Hypothesis</dt><dd>A falsifiable prediction with a practical threshold, judged against the experiment designed to test it.</dd>
+  </dl>
+
+  <h3>Five statuses</h3>
+  <p>Every entry carries the maintainer’s scoped judgement. In this revision:</p>
+</div>
+
+<div class="rsi-tablewrap rsi-tablewrap--read">
+  <table class="pp-table rsi-status">
+    <thead><tr><th scope="col">Status</th><th scope="col">Meaning</th><th scope="col" class="num">Hypotheses</th><th scope="col" class="num">All entries</th></tr></thead>
+    <tbody>
+      <tr><td><span class="rsi-tag" data-tone="ok">Supported</span></td><td>The evidence meets the stated prediction, within its scope</td><td class="num">2</td><td class="num">41</td></tr>
+      <tr><td><span class="rsi-tag" data-tone="warn">Mixed evidence</span></td><td>Some prespecified screens passed and others missed</td><td class="num">7</td><td class="num">7</td></tr>
+      <tr><td><span class="rsi-tag" data-tone="err">Refuted</span></td><td>The prespecified bar was not met</td><td class="num">7</td><td class="num">7</td></tr>
+      <tr><td><span class="rsi-tag">Untested</span></td><td>Proposed, with no decisive experiment yet</td><td class="num">4</td><td class="num">4</td></tr>
+      <tr><td><span class="rsi-tag" data-tone="muted">Superseded</span></td><td>Replaced by a better-scoped entry</td><td class="num">1</td><td class="num">1</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="2">Total</td><td class="num">21</td><td class="num">60</td></tr></tfoot>
+  </table>
+</div>
+
+<div class="rsi-prose">
+  <p>Every observation and experience entry is “supported”: these entries record what was measured or documented. The interesting statuses are on hypotheses, where 14 of 21 are mixed or refuted. That is what careful testing of small effects looks like.</p>
+
+  <h3>The panels</h3>
+  <ul>
+    <li><strong>Knowledge entry.</strong> Pick a claim from the menu. Its statement, kind, status and evidence counts appear below it.</li>
+    <li><strong>Evidence relationships.</strong> Supporting records sit on the left with solid lines, opposing records on the right with dashed lines. A node id is an experiment; other chips are documentation sources. Click one to see its metrics or source link and its SHA-256 hashes. Several records can describe the same experiment, so counting chips is not counting replications.</li>
+    <li><strong>Scope, alternatives and next test.</strong> Where the claim applies, what else could explain it, and the experiment that would tell the two apart. Read this before generalizing a claim.</li>
+    <li><strong>Published revisions.</strong> Pick a revision to see which entries changed status, before and after, with the recorded reason.</li>
+    <li><strong>Research agenda.</strong> The current motivation, method, open questions and planned next experiments.</li>
+  </ul>
+
+  <h3>Entries worth opening</h3>
+  <ul class="rsi-starts">
+    <li><button type="button" class="rsi-jump" data-tone="err" data-jump-claim="n016-depthwise-practical-benefit">Refuted</button><span><strong>Depthwise did not meet its predeclared practical-improvement threshold.</strong> The best-scoring node’s hypothesis, judged against its own bar.</span></li>
+    <li><button type="button" class="rsi-jump" data-tone="ok" data-jump-claim="n009-depth8-l2-10-practical-contrast">Supported</button><span><strong>Depth-8/L2=10 exceeded a fresh depth-6/L2=3 control.</strong> The run’s clearest finding, confirmed against a freshly rebuilt control.</span></li>
+    <li><button type="button" class="rsi-jump" data-tone="ok" data-jump-claim="n017-symmetric-depthwise-practical-proximity">Supported</button><span><strong>Fresh SymmetricTree met the proximity margin to Depthwise.</strong> The rerun that reproduced n014’s score exactly.</span></li>
+    <li><button type="button" class="rsi-jump" data-tone="muted" data-jump-claim="airline-depth-and-regularization-effects">Superseded</button><span><strong>An earlier reading of the depth and L2 effects,</strong> replaced once a matched depth-8/L2=3 arm was run. This is the Wiki correcting itself.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-claim="catboost-gpu-nondeterminism-magnitude-unknown">Experience</button><span><strong>GPU training can be nondeterministic, and the size of the effect here is unknown.</strong> The caveat behind every single-seed comparison.</span></li>
+  </ul>
+  <p class="rsi-aside">This Wiki revision was exported about 45 minutes after the search-tree snapshot, so it already includes results from n019 and n020.</p>
+</div>
+
+<!--@widget-->

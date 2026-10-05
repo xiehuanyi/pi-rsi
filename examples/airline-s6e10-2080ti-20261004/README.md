@@ -116,6 +116,8 @@ python3 scripts/build_blog_visualizations.py \
   --kit /path/to/pocketplay-platform/kit/v2
 ```
 
+The English pages wrap the views in a long-form reading guide (project introduction, how to read each figure, highlights and limits) from `scripts/blog-guide/`. Its prose quotes this snapshot's numbers, so the build stops if a refreshed archive no longer matches them; update the guide text and `GUIDE_FACTS` together. Chinese pages are unchanged.
+
 `scripts/deploy_blog_visualizations.py` installs only this static component inside the existing `pocket` container: a new immutable component release, an atomic link for its fixed URL prefix, a private rollback receipt, and a robots.txt declaration for its six-page sitemap. It does not replace the platform or legacy blog release, modify Nginx routing, touch accounts or call an LLM. Article JSON in `blog/` is published through the existing limited editorial publisher. Refresh the archive and build again to update the visual snapshots; no automatic polling or new scheduled job is added.
 
 Publication checks: all six live pages returned 200 and passed the primary node/evidence/revision interactions; 390px and 1440px layouts fit, with light/dark checks. Public data and sitemap files were accessible in the browser; representative live script assets matched the build. English/Chinese article canonicals, links, RSS and the editorial sitemap were checked. The research sitemap was discovered in the shared index from the robots declaration. Existing Cloudflare telemetry injection is blocked by the site's existing CSP on both old and new pages; it did not affect the application interactions. This is not a claim of Google indexing.
