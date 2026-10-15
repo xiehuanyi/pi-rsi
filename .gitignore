@@ -16,3 +16,7 @@ pi_rsi/tasks/*/runs/
 pi_rsi/tasks/*/_newtask/
 pi_rsi/tasks/st-auto/
 jobs/
+pi_rsi/tasks/*/starter/data/*.csv
+work/blog-preview/
+work/blog-publish/
+work/architecture-reference/

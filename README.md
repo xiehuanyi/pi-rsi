@@ -1,7 +1,20 @@
 # pi-rsi — auto-research harness
 
+[English](README.md) · [简体中文](README.zh-CN.md)
+
 Status: v0.1, research prototype. Built and tested on one Linux workstation with the Grok CLI and a pinned
 [pi](https://github.com/earendil-works/pi) 0.85.1. MIT licensed. Experiment write-ups: https://blog.pocketplay.win/rsi/
+
+## Overview
+
+pi-rsi turns a task pack—problem, starter code and **frozen evaluator**—into a persistent research tree.
+Agents choose and implement hypotheses in isolated Git worktrees; the harness records official measurements,
+audits the result and retains the handoff for the next decision. Budgets, waiting and recovery are controller responsibilities.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pi-rsi-overview-en-dark.svg">
+  <img src="docs/assets/pi-rsi-overview-en-light.svg" alt="pi-rsi research loop: frozen task and baseline, choose a hypothesis, implement and evaluate, review evidence and feed the next decision; inset shows one research node">
+</picture>
 
 New experiments use a **sequential research loop over the search tree**: implement one approach with a
 tuning budget, wait on its external task monitor, analyze the official result, and propose the next
@@ -12,16 +25,36 @@ validate, and maintains the three-layer research wiki (immutable raw sources, ge
 navigation index) and visualization explanations.
 Existing experiments opt in with `rsi research enable <experiment>`. See [research loop and task monitor](docs/RESEARCH_LOOP.md).
 
-pi-rsi runs a long-horizon research loop: it takes a task pack (problem statement, starter code, **frozen evaluator**),
-grows a search tree of hypotheses, and lets a headless coding agent implement one hypothesis per node in its own git
-worktree. Every node ends with a machine-parsed handoff, an official score computed by the harness, and an audited
-summary. Utility agents (planner, auditor, diagnoser) are separated from the workers and run as cheap single-turn
-structured calls. Nothing in the loop keeps an LLM idle: waiting, timeouts, retries, and crash recovery are plain code.
+The Wiki and task-monitor extensions shown here describe the development research runtime used by the airline example below.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pi-rsi-overview-en-dark.svg">
-  <img src="docs/assets/pi-rsi-overview-en-light.svg" alt="pi-rsi research loop and per-node execution">
-</picture>
+## Case study: when the researcher picks a biased proxy (CASMI26, 2026-10)
+
+A 4-day run on the Kaggle CASMI26 MS/MS-to-structure task stalled for 19 nodes at a local MRR of 0.404. An audit
+found the research lead had turned the competition playbook's "never give back a won segment" into a development
+gate: every class and source had to improve on both seeds, on a dev set where one segment had 14 molecules. Workers
+therefore shipped new components switched off, and 22 of 31 official evaluations measured outputs identical to
+their parent. The fix lives in the harness, not in per-run notes: the playbook now optimizes the official aggregate,
+workers declare what they deliver (`DELIVERY.json`), switched-off components are measured switched on, a `PROXY.md`
+ledger tracks how development, forecast and official deltas agree, and `rsi observe` feeds results on the real target
+(e.g. the Kaggle leaderboard) back to the lead. Two nodes after the playbook change, the run found its first new best
+in 20 nodes (0.4185, +0.0146). Write-up with the interactive score chart and search tree:
+[English](https://blog.pocketplay.win/en/blog/pi-rsi-casmi26-proxy-alignment-20261015/) ·
+[中文](https://blog.pocketplay.win/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/).
+Details: [research loop, section "Proxy 的质量"](docs/RESEARCH_LOOP.md).
+
+## Real experiment: airline satisfaction
+
+A real RTX 2080 Ti search is archived with an offline chart, the full search explorer, aggregate metrics,
+and exact baseline/current-best source. It is a preliminary snapshot of a continuing campaign.
+The offline [research Wiki](examples/airline-s6e10-2080ti-20261004/wiki.html) links knowledge entries to
+supporting/opposing evidence and published belief revisions.
+Live on the blog: [experiment overview](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/),
+[full search tree](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/),
+[research Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/).
+Read the [English README](examples/airline-s6e10-2080ti-20261004/README.md) or
+[中文 README](examples/airline-s6e10-2080ti-20261004/README.zh-CN.md).
+
+![Airline experiment score progression](examples/airline-s6e10-2080ti-20261004/preview.png)
 
 ## Layout
 

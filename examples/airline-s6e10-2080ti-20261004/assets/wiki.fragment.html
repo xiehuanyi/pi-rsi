@@ -1,0 +1,138 @@
+<div id="pi-rsi-wiki-oct04">
+  <h2>研究 Wiki · 知识与证据</h2>
+  <div id="wk-summary" class="text-small text-muted"></div>
+  <div class="wk-select">
+    <label for="wk-claim" class="form-label">知识条目</label>
+    <select id="wk-claim" class="form-select"></select>
+  </div>
+  <div id="wk-claim-detail" aria-live="polite"></div>
+  <h3>证据关系</h3>
+  <div id="wk-graph" class="wk-graph">
+    <svg id="wk-edges" role="img" aria-label="支持和反对证据与所选知识条目的关系"></svg>
+    <div class="wk-support"><div class="text-small">支持证据</div><div id="wk-supports" class="wk-sources"></div></div>
+    <div class="wk-center"><div class="card"><div class="text-small">当前条目</div><div id="wk-center-status"></div></div></div>
+    <div class="wk-oppose"><div class="text-small">反对证据</div><div id="wk-opposes" class="wk-sources"></div></div>
+  </div>
+  <div class="text-small text-muted">实线：支持　虚线：反对 · 证据条目数不代表独立重复次数</div>
+  <div id="wk-evidence-detail" class="wk-evidence-detail" aria-live="polite"></div>
+  <details class="wk-fold">
+    <summary>适用范围、其他解释与下一步验证</summary>
+    <div id="wk-scope"></div>
+  </details>
+  <details class="wk-fold">
+    <summary id="wk-history-label">知识版本与结论变化</summary>
+    <label for="wk-revision" class="form-label">发布版本</label>
+    <select id="wk-revision" class="form-select"></select>
+    <div id="wk-history" aria-live="polite"></div>
+  </details>
+  <details class="wk-fold">
+    <summary>研究议程与尚未解决的问题</summary>
+    <div id="wk-agenda"></div>
+  </details>
+</div>
+<style>
+  #pi-rsi-wiki-oct04 { position:relative; }
+  #pi-rsi-wiki-oct04 h2 { padding-right:94px; }
+  #pi-rsi-wiki-oct04 h3 { margin-top:16px; margin-bottom:8px; }
+  #pi-rsi-wiki-oct04 .wk-select { display:grid; gap:5px; margin:14px 0; }
+  #pi-rsi-wiki-oct04 #wk-claim-detail { display:grid; gap:8px; }
+  #pi-rsi-wiki-oct04 .wk-title { font-weight:500; }
+  #pi-rsi-wiki-oct04 .wk-graph { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 108px minmax(0,1fr); gap:30px; align-items:center; padding:8px 0; }
+  #pi-rsi-wiki-oct04 #wk-edges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #pi-rsi-wiki-oct04 .wk-support, #pi-rsi-wiki-oct04 .wk-oppose, #pi-rsi-wiki-oct04 .wk-center { position:relative; }
+  #pi-rsi-wiki-oct04 .wk-sources { display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
+  #pi-rsi-wiki-oct04 .wk-evidence-detail { display:grid; gap:5px; margin:12px 0; overflow-wrap:anywhere; }
+  #pi-rsi-wiki-oct04 .wk-fold { margin-top:14px; }
+  #pi-rsi-wiki-oct04 .wk-fold summary { font-weight:500; }
+  #pi-rsi-wiki-oct04 .wk-fold[open] > :not(summary) { margin-top:10px; }
+  #pi-rsi-wiki-oct04 .wk-section { display:grid; gap:6px; margin-top:10px; }
+  #pi-rsi-wiki-oct04 .wk-version-change { display:grid; gap:5px; margin-top:12px; }
+  @media(max-width:520px) {
+    #pi-rsi-wiki-oct04 .wk-graph { grid-template-columns:1fr; gap:26px; }
+    #pi-rsi-wiki-oct04 .wk-center { justify-self:center; }
+  }
+</style>
+<script type="application/json" id="wk-data">__WIKI_PAYLOAD__</script>
+<script>
+(() => {
+  const root=document.getElementById('pi-rsi-wiki-oct04');
+  const data=JSON.parse(document.getElementById('wk-data').textContent);
+  const claims=new Map(data.claims.map(c=>[c.id,c])), evidence=new Map(data.evidence.map(e=>[e.id,e]));
+  const kind={observation:'观察',hypothesis:'假设',experience:'经验'};
+  const status={supported:'获证据支持',untested:'待验证',mixed:'证据混合',refuted:'被反驳',superseded:'已被替代'};
+  const sel=root.querySelector('#wk-claim'), rev=root.querySelector('#wk-revision');
+  const graph=root.querySelector('#wk-graph'), edges=root.querySelector('#wk-edges');
+  const detail=root.querySelector('#wk-evidence-detail');
+  const prior=window.openai?.widgetState?.privateContent;
+  let current=claims.has(prior?.claim)?prior.claim:(claims.has('n010-depth8-l2-3-practical-retention')?'n010-depth8-l2-3-practical-retention':data.claims[0].id);
+  let chosenEvidence=null;
+  const date=s=>s?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Riyadh',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s)):'';
+  root.querySelector('#wk-summary').textContent=data.claims.length+' 条知识 · '+data.evidence.length+' 条证据记录 · '+data.history.length+' 个发布版本 · '+date(data.updated_at)+'（沙特时间）';
+  root.querySelector('#wk-history-label').textContent='知识版本与结论变化（'+data.history.length+' 个版本）';
+  function element(tag,text,className) {const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
+  function save() {if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{wikiRevision:data.revision,claim:current,evidence:chosenEvidence},privateContent:{claim:current,revision:rev.value,evidence:chosenEvidence}}).catch(()=>{});}
+  for(const type of ['observation','hypothesis','experience']) {
+    const group=element('optgroup');group.label=kind[type];
+    data.claims.filter(c=>c.kind===type).forEach(c=>{const option=element('option',c.title+' · '+status[c.status]);option.value=c.id;group.append(option);});sel.append(group);
+  }
+  data.history.forEach((h,i)=>{const option=element('option',date(h.updated_at)+' · '+h.claim_count+' 条 · '+h.changes.length+' 项更新'+(i===0?'（当前）':''));option.value=h.revision;rev.append(option);});
+  if(data.history.some(h=>h.revision===prior?.revision))rev.value=prior.revision;
+  function section(container,label,text) {const s=element('div',undefined,'wk-section');s.append(element('div',label,'wk-title'));if(Array.isArray(text)){const list=element('ul');text.forEach(t=>list.append(element('li',t)));s.append(list);}else s.append(element('div',text||'无'));container.append(s);}
+  function showEvidence(id,remember=true) {
+    const e=evidence.get(id);chosenEvidence=id;detail.replaceChildren();
+    detail.append(element('div',(e.kind==='experiment'?'实验记录':'文档记录')+' · '+(e.node||e.title),'wk-title'));
+    if(e.kind==='experiment') {
+      const score=e.score===null||e.score===undefined?'无有效分数':Number(e.score).toFixed(10);
+      detail.append(element('div','AUC '+score+' · 测量状态 '+({validated:'有效',unavailable:'不可用',invalid:'失效'}[e.measurement_status]||e.measurement_status||'未记录'),'tabular-nums'));
+      detail.append(element('div',e.title));
+    } else if(e.source_url) {
+      const a=element('a','打开原文来源');a.href=e.source_url;a.target='_blank';a.rel='noopener noreferrer';detail.append(a);
+    }
+    detail.append(element('div',e.id,'text-small'));
+    const hashes=element('details');hashes.append(element('summary','记录身份与哈希'));
+    hashes.append(element('div','原始记录 SHA-256：'+e.packet_sha256,'text-small'));
+    if(e.commit)hashes.append(element('div','代码提交：'+e.commit,'text-small'));
+    if(e.sha256)hashes.append(element('div','来源文本 SHA-256：'+e.sha256,'text-small'));detail.append(hashes);
+    graph.querySelectorAll('button[data-evidence]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.evidence===id)));if(remember)save();
+  }
+  function sourceButtons(ids,target,role) {
+    target.replaceChildren();if(!ids.length){target.append(element('span','无记录','text-small text-muted'));return;}
+    ids.forEach(id=>{const e=evidence.get(id);const b=element('button',e.node||'文档 '+(data.evidence.indexOf(e)+1),'btn text-small');b.type='button';b.dataset.evidence=id;b.dataset.relation=role;b.setAttribute('data-tooltip',e.title);b.setAttribute('aria-label',role+'证据：'+e.title);b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>showEvidence(id));target.append(b);});
+  }
+  function drawEdges() {
+    edges.replaceChildren();const rect=graph.getBoundingClientRect();edges.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);
+    const ns='http://www.w3.org/2000/svg',center=graph.querySelector('.wk-center').getBoundingClientRect(),vertical=getComputedStyle(graph).gridTemplateColumns.split(' ').length===1;
+    graph.querySelectorAll('button[data-relation]').forEach(b=>{
+      const br=b.getBoundingClientRect(),opposed=b.dataset.relation==='反对';let a,z;
+      if(vertical){a=[br.left+br.width/2-rect.left,opposed?br.top-rect.top:br.bottom-rect.top];z=[center.left+center.width/2-rect.left,opposed?center.bottom-rect.top:center.top-rect.top];}
+      else{a=[opposed?br.left-rect.left:br.right-rect.left,br.top+br.height/2-rect.top];z=[opposed?center.right-rect.left:center.left-rect.left,center.top+center.height/2-rect.top];}
+      const p=document.createElementNS(ns,'path');const mid=vertical?(a[1]+z[1])/2:(a[0]+z[0])/2;
+      p.setAttribute('d',vertical?`M${a[0]},${a[1]} C${a[0]},${mid} ${z[0]},${mid} ${z[0]},${z[1]}`:`M${a[0]},${a[1]} C${mid},${a[1]} ${mid},${z[1]} ${z[0]},${z[1]}`);
+      p.setAttribute('fill','none');p.setAttribute('stroke',opposed?'var(--viz-series-2)':'var(--viz-series-1)');p.setAttribute('stroke-width','1.5');if(opposed)p.setAttribute('stroke-dasharray','4 4');edges.append(p);
+    });
+  }
+  function showClaim() {
+    sel.value=current;const c=claims.get(current),pane=root.querySelector('#wk-claim-detail');pane.replaceChildren();sel.setAttribute('data-tooltip',c.title);
+    pane.append(element('div',c.title,'wk-title'));pane.append(element('div',kind[c.kind]+' · '+status[c.status]+' · 支持 '+c.supports.length+' / 反对 '+c.opposes.length,'text-small'));pane.append(element('div',c.statement));
+    root.querySelector('#wk-center-status').textContent=status[c.status];
+    sourceButtons(c.supports,root.querySelector('#wk-supports'),'支持');sourceButtons(c.opposes,root.querySelector('#wk-opposes'),'反对');
+    detail.replaceChildren();chosenEvidence=null;
+    const scope=root.querySelector('#wk-scope');scope.replaceChildren();section(scope,'适用范围',c.scope);section(scope,'其他解释',c.alternatives);section(scope,'下一步区分性验证',c.next_test);
+    if(c.supersedes&&claims.has(c.supersedes)){const b=element('button','查看被替代的条目','btn');b.type='button';b.addEventListener('click',()=>{current=c.supersedes;showClaim();save();});scope.append(b);}
+    requestAnimationFrame(drawEdges);
+  }
+  function showHistory() {
+    const h=data.history.find(h=>h.revision===rev.value),pane=root.querySelector('#wk-history');pane.replaceChildren();
+    pane.append(element('div',h.revision,'text-small'));pane.append(element('div',h.what_changed));
+    h.changes.forEach(change=>{const s=element('div',undefined,'wk-version-change');
+      const b=element('button',claims.get(change.claim)?.title||change.claim,'btn text-small');b.type='button';b.disabled=!claims.has(change.claim);b.addEventListener('click',()=>{current=change.claim;showClaim();save();});s.append(b);
+      s.append(element('div',(status[change.before]||'新增')+' → '+(status[change.after]||change.after),'wk-title'));
+      if(change.reason!==h.what_changed)s.append(element('div',change.reason));pane.append(s);});
+    if(!h.changes.length)pane.append(element('div','本版本没有记录条目状态更新。','text-small'));
+  }
+  const agenda=root.querySelector('#wk-agenda');for(const [key,label] of [['motivation','研究动机'],['method','方法与判断依据'],['open_questions','开放问题'],['next_experiments','下一步实验']])section(agenda,label,data.agenda[key]);
+  sel.addEventListener('change',()=>{current=sel.value;showClaim();save();});rev.addEventListener('change',()=>{showHistory();save();});
+  window.addEventListener('openai:set_globals',event=>{const s=event.detail?.globals?.widgetState?.privateContent;if(!s)return;if(claims.has(s.claim)&&s.claim!==current){current=s.claim;showClaim();}if(evidence.has(s.evidence)&&s.evidence!==chosenEvidence)showEvidence(s.evidence,false);if(s.revision!==rev.value&&data.history.some(h=>h.revision===s.revision)){rev.value=s.revision;showHistory();}});
+  new ResizeObserver(drawEdges).observe(graph);showClaim();showHistory();if(evidence.has(prior?.evidence))showEvidence(prior.evidence,false);
+})();
+</script>

@@ -1,0 +1,30 @@
+name = "airline-s6e10-2080ti"
+[task]
+brief = "TASK.md"
+docs = ["docs/DATA.md", "docs/PROTOCOL.md", "docs/HARDWARE.md", "docs/BASELINE.json"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+[eval]
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --python {python} --quiet"
+worker_eval_command = "{python} eval/eval.py --agent-dir . --seedset {seedset} --out runs/quick/metrics.json --python {python}"
+worker_val_command = ""
+seedsets = ["quick", "validation", "final"]
+official_seedset = "validation"
+final_seedset = ""
+final_eval_root = false
+quick_seedset = "quick"
+eval_timeout_s = 360
+higher_is_better = true
+score_key = "score"
+reference_scores = { starter = 0.9571858140052044, starter_quick = 0.9525373326142100 }
+job_enabled = true
+job_command = "{python} {task_dir}/eval/run.py --budget {budget} --run-dir {run_dir}"
+job_gpus = 1
+job_resumable = false
+job_timeout_s = 360
+job_stall_s = 0
+job_early_stop = {}
+final_top_k = 1
+job_budgets = { quick = 60, validation = 180, final = 240 }
+link_dirs = []
