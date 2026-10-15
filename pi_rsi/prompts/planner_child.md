@@ -14,5 +14,16 @@ $siblings
 # Verified insights
 $insights
 
-# Dead ends
+# Previous unsuccessful attempts (conditional, not permanent bans)
 $deadends
+
+$research_memory
+
+# Previously queued proposals
+$queued
+
+Reassess these candidates against current evidence, including other branches. Retain still-useful candidates,
+revise their scope, or replace obsolete ones. These outputs replace the unused queue; do not repeat explored siblings.
+For each proposal include research_question, prediction, falsifier, and evidence_ids (a list).
+Include a discriminating ablate/debug proposal when competing explanations remain. Explain what each possible
+outcome would change; a useful ablation need not improve the score.

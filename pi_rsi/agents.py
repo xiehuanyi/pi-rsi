@@ -1,8 +1,9 @@
-"""Utility agents: planner, auditor, diagnoser. Stateless, single-turn, no tools, structured JSON output.
+"""Utility agents: planner, auditor, diagnoser. Stateless, no tools, structured JSON output.
 They never touch code; they read files the harness hands them and return JSON. Cheap model by default."""
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,23 +13,40 @@ from .util import now_iso, fmt_score
 
 
 class Utility:
-    def __init__(self, orch):
+    def __init__(self, orch, runner=None, call_cfg=None, cost_kind="utility"):
         self.o = orch
         self.cfg = orch.cfg
-        self.runner = orch.utility_runner
+        self.runner = runner if runner is not None else orch.utility_runner
+        self.call_cfg = call_cfg if call_cfg is not None else orch.cfg.utility
+        self.cost_kind = cost_kind
 
     def _ask(self, name: str, prompt: str, schema: dict, node_id: str = "_utility") -> Any:
         log_dir = self.cfg.nodes_dir / node_id
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"utility.{name}.{now_iso().replace(':', '')}.jsonl"
-        data, res = self.runner.ask_json(prompt, cwd=self.cfg.dir, log_path=log_path, schema=schema,
-                                         timeout_s=self.cfg.utility.timeout_s)
-        self.o.log("utility", name=name, node=node_id, ok=res.ok, duration_s=round(res.duration_s, 1),
-                   cost_usd=res.cost_usd, usage=res.usage, error=res.error)
-        self.o.add_cost("utility", res)
-        if not res.ok or data is None:
-            raise RuntimeError(f"utility {name} failed: {res.error or 'no JSON'} (log {log_path})")
-        return data
+        stamp = now_iso().replace(':', '')
+        deadline = time.monotonic() + self.call_cfg.timeout_s
+        wall = getattr(getattr(self.cfg, "search", None), "max_wallclock_s", None)
+        closeout_deadline = getattr(self.o, "_closeout_deadline", None)
+        if closeout_deadline is not None:
+            deadline = min(deadline, closeout_deadline)
+        elif wall:
+            deadline = min(deadline, time.monotonic() + max(0, wall - (time.time() - self.o.started_ts)))
+        failure = "utility time budget exhausted"
+        for attempt in (1, 2):
+            remaining = deadline - time.monotonic()
+            stopping = getattr(self.o, "stop_flag", None)
+            if remaining <= 0 or (attempt > 1 and stopping is not None and stopping.is_set()):
+                break
+            log_path = log_dir / f"utility.{name}.{stamp}.attempt{attempt}.jsonl"
+            data, res = self.runner.ask_json(prompt, cwd=self.cfg.dir, log_path=log_path, schema=schema,
+                                             timeout_s=remaining)
+            self.o.log(self.cost_kind, name=name, node=node_id, attempt=attempt, ok=res.ok,
+                       duration_s=round(res.duration_s, 1), cost_usd=res.cost_usd, usage=res.usage, error=res.error)
+            self.o.add_cost(self.cost_kind, res)
+            if res.ok and data is not None:
+                return data
+            failure = f"{res.error or 'no JSON'} (log {log_path})"
+        raise RuntimeError(f"utility {name} failed: {failure}")
 
     # planner ---------------------------------------------------------------
     def plan_root(self, k: int) -> list[dict[str, Any]]:
@@ -40,9 +58,11 @@ class Utility:
         return _clean_proposals(data)[:k]
 
     # auditor ---------------------------------------------------------------
-    def audit(self, node: Node, metrics: dict, gitlog: str, diffstat: str, noise: float) -> dict[str, Any]:
+    def audit(self, node: Node, metrics: dict, gitlog: str, diffstat: str, noise: float,
+              assessment: dict | None = None) -> dict[str, Any]:
         try:
-            data = self._ask("auditor", P.auditor_prompt(self.cfg, self.o.tree, node, metrics, gitlog, diffstat, noise),
+            data = self._ask("auditor", P.auditor_prompt(self.cfg, self.o.tree, node, metrics, gitlog, diffstat, noise,
+                                                         assessment),
                              P.AUDIT_SCHEMA, node.id)
             if isinstance(data, dict) and "summary" in data:
                 data.setdefault("insights", [])
@@ -94,5 +114,10 @@ def _clean_proposals(data: Any) -> list[dict[str, Any]]:
             "type": str(it.get("type", "idea")).strip() if str(it.get("type", "idea")) in ("idea", "debug", "ablate", "scale") else "idea",
             "expected_gain": str(it.get("expected_gain", "")).strip(),
             "risk": str(it.get("risk", "")).strip(),
+            "research_question": str(it.get("research_question", "")).strip(),
+            "prediction": str(it.get("prediction", "")).strip(),
+            "falsifier": str(it.get("falsifier", "")).strip(),
+            "evidence_ids": [x for x in it.get("evidence_ids", []) if isinstance(x, str)]
+                            if isinstance(it.get("evidence_ids", []), list) else [],
         })
     return out

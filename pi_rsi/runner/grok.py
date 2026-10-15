@@ -16,9 +16,11 @@ class GrokRunner(Runner):
     def __init__(self, model: str, effort: str = "high", extra_args: list[str] | None = None):
         super().__init__(model, effort, extra_args)
         self.binary = os.environ.get("RSI_GROK_BIN") or shutil.which("grok") or "grok"
+        self.enable_web_search = False
 
     def _common(self, cwd: Path) -> list[str]:
-        return [self.binary, "--always-approve", "--no-subagents", "--disable-web-search", "--no-plan",
+        web = [] if self.enable_web_search else ["--disable-web-search"]
+        return [self.binary, "--always-approve", "--no-subagents", *web, "--no-plan",
                 "--verbatim", "-m", self.model, "--reasoning-effort", self.effort, "--cwd", str(cwd), *self.extra_args]
 
     def new_session_id(self) -> str | None:
@@ -39,7 +41,10 @@ class GrokRunner(Runner):
 
     def build_json_cmd(self, prompt_file: Path, cwd: Path, schema: dict | None, session_dir: Path) -> list[str]:
         cmd = [*self._common(cwd), "--prompt-file", str(prompt_file), "--output-format", "json", "--tools", "",
-               "--max-turns", "1"]
+               # The CLI's structured-output completion can require another internal
+               # turn. A cap of one intermittently exits before returning any JSON.
+               # Tools remain disabled; the outer utility timeout is unchanged.
+               "--max-turns", "3"]
         if schema:
             cmd += ["--json-schema", json.dumps(schema)]
         return cmd

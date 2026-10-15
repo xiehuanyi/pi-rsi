@@ -13,6 +13,7 @@ _PKG_ROOT = Path(__file__).resolve().parents[2]
 
 class PiRunner(Runner):
     kind = "pi"
+    prompt_on_stdin = True  # pi uses piped stdin as the initial message; argv would overflow at 128 KiB
 
     def __init__(self, model: str, effort: str = "high", extra_args: list[str] | None = None):
         super().__init__(model, effort, extra_args)
@@ -24,28 +25,31 @@ class PiRunner(Runner):
         return f"{self.model}:{self.effort}" if self.effort and ":" not in self.model else self.model
 
     def _common(self, session_dir: Path) -> list[str]:
+        # No user extensions: tools such as durable background tasks or subagents run outside the supervised
+        # session (timeouts, cost accounting, the campaign's memory cgroup) and can outlive it.
         return [self.binary, "--mode", "json", "--model", self._model_arg(), "--session-dir", str(session_dir),
-                "--no-skills", "--no-prompt-templates", "--no-context-files", *self.extra_args]
+                "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-extensions", *self.extra_args]
 
+    # The prompt file is piped to stdin by Runner._supervise (prompt_on_stdin).
     def build_agent_cmd(self, prompt_file: Path, cwd: Path, max_turns: int, session_dir: Path,
                         session_id: str | None = None) -> list[str]:
-        prompt = prompt_file.read_text(encoding="utf-8")
-        return [*self._common(session_dir), "--", prompt]
+        return self._common(session_dir)
 
     def build_resume_cmd(self, session_id: str, prompt_file: Path, cwd: Path, max_turns: int, session_dir: Path) -> list[str]:
-        prompt = prompt_file.read_text(encoding="utf-8")
         # pi writes one JSONL per session under session_dir; resume the newest one when no id is known
         target = session_id
         files = sorted(session_dir.rglob("*.jsonl"), key=lambda f: f.stat().st_mtime)
         if files and (not session_id or not any(session_id in f.name for f in files)):
             target = str(files[-1])
-        return [*self._common(session_dir), "--session", target, "--", prompt]
+        return [*self._common(session_dir), "--session", target]
 
     def build_json_cmd(self, prompt_file: Path, cwd: Path, schema: dict | None, session_dir: Path) -> list[str]:
-        prompt = prompt_file.read_text(encoding="utf-8")
         if schema:
-            prompt += "\n\nOutput ONLY a JSON document matching this JSON schema, no prose:\n" + json.dumps(schema)
-        return [*self._common(session_dir), "--no-tools", "--", prompt]
+            # Keep the file an exact record of what pi receives on stdin.
+            prompt = prompt_file.read_text(encoding="utf-8")
+            prompt_file.write_text(prompt + "\n\nOutput ONLY a JSON document matching this JSON schema, no prose:\n"
+                                   + json.dumps(schema), encoding="utf-8")
+        return [*self._common(session_dir), "--no-tools"]
 
     def env(self) -> dict[str, str]:
         env = dict(os.environ)

@@ -4,9 +4,16 @@ Turn 1: returns a `bash` tool call writing out.txt. Turn 2 (after the tool resul
 Usage: mock_openai.py <port>
 """
 import json
+import os
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+def _text(content):
+    if isinstance(content, str):
+        return content
+    return "".join(part.get("text", "") for part in content or [] if isinstance(part, dict))
 
 
 def sse(handler, obj):
@@ -30,6 +37,11 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         req = json.loads(self.rfile.read(n) or b"{}")
         msgs = req.get("messages", [])
+        if os.environ.get("MOCK_REQUEST_LOG"):  # lets tests check what actually reached the model
+            users = [_text(m.get("content")) for m in msgs if m.get("role") == "user"]
+            with open(os.environ["MOCK_REQUEST_LOG"], "a") as f:
+                f.write(json.dumps({"user_chars": [len(u) for u in users],
+                                    "last_user_tail": users[-1][-80:] if users else ""}) + "\n")
         has_tool_result = any(m.get("role") == "tool" for m in msgs)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream"); self.send_header("Cache-Control", "no-cache")

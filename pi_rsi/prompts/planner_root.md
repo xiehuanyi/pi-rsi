@@ -16,3 +16,9 @@ $starter_code
 
 # Documentation excerpt
 $docs_excerpt
+
+$research_memory
+
+For each proposal include research_question, prediction, falsifier, and evidence_ids (a list).
+When memory identifies competing explanations, include an ablate/debug experiment that distinguishes them.
+Use source IDs to justify proposals; an unsupported novelty claim is not a research motivation.

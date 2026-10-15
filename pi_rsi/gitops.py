@@ -61,6 +61,41 @@ def remove_worktree(repo: Path, worktree: Path, branch: str | None = None) -> No
         git(["branch", "-D", branch], cwd=repo, check=False)
 
 
+def prune_ignored(worktree: Path, min_bytes: int) -> list[tuple[str, int]]:
+    """Delete git-ignored regular files of at least `min_bytes` (caches, features, checkpoints) from a
+    finished worktree. Symlinks (linked task data) and tracked files are never touched."""
+    removed = []
+    if not worktree.exists():
+        return removed
+    listing = git(["ls-files", "-z", "--others", "--ignored", "--exclude-standard"], cwd=worktree, check=False)
+    for rel in filter(None, listing.split("\0")):
+        path = worktree / rel
+        try:
+            st = path.lstat()
+        except OSError:
+            continue
+        if path.is_symlink() or not path.is_file() or st.st_size < min_bytes:
+            continue
+        try:
+            path.unlink()
+            removed.append((rel, st.st_size))
+        except OSError:
+            pass
+    return removed
+
+
+def on_branch_between(worktree: Path, base: str, commit: str) -> bool:
+    """`commit` exists, descends from `base` and is contained in HEAD (a state the worker committed)."""
+    def ancestor(a, b):
+        return run_cmd(["git", "merge-base", "--is-ancestor", a, b], cwd=worktree).returncode == 0
+    return bool(commit) and ancestor(base, commit) and ancestor(commit, "HEAD")
+
+
+def restore_tree(worktree: Path, commit: str) -> None:
+    """Make the working tree and index exactly `commit`'s tree (files added later are removed)."""
+    git(["restore", "--source", commit, "--staged", "--worktree", "--", ":/"], cwd=worktree)
+
+
 def commit_all(worktree: Path, message: str) -> str | None:
     """Commit any pending changes; return new HEAD or None if nothing to commit."""
     git(["add", "-A"], cwd=worktree)

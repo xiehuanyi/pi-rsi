@@ -37,6 +37,9 @@ class RunResult:
 
 class Runner:
     kind = "base"
+    # Runners whose CLI reads the prompt from stdin. Never pass a prompt as one argv string:
+    # Linux caps a single argument at 128 KiB (E2BIG), and research prompts grow with the tree.
+    prompt_on_stdin = False
 
     def __init__(self, model: str, effort: str = "high", extra_args: list[str] | None = None):
         self.model = model
@@ -67,7 +70,8 @@ class Runner:
 
     # shared supervision ---------------------------------------------------
     def _supervise(self, cmd: list[str], cwd: Path, log_path: Path, timeout_s: float, idle_timeout_s: float,
-                   on_event: Callable[[dict[str, Any]], None] | None, session_id: str | None = None) -> RunResult:
+                   on_event: Callable[[dict[str, Any]], None] | None, session_id: str | None = None,
+                   stdin_path: Path | None = None) -> RunResult:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         state: dict[str, Any] = {"final_text": "", "usage": {}, "stop_reason": "", "session_id": session_id,
                                  "tool_calls": 0, "structured": None, "num_turns": None, "cost_usd": None,
@@ -76,14 +80,21 @@ class Runner:
         start = time.time()
         stderr_path = log_path.with_suffix(".stderr")
         with open(log_path, "a", encoding="utf-8") as log, open(stderr_path, "a", encoding="utf-8") as errf:
-            log.write(json.dumps({"rsi": "start", "cmd": cmd, "cwd": str(cwd), "t": start}) + "\n")
+            log.write(json.dumps({"rsi": "start", "cmd": cmd, "cwd": str(cwd), "t": start,
+                                  **({"stdin": str(stdin_path)} if stdin_path else {})}) + "\n")
             log.flush()
+            stdin = open(stdin_path, "rb") if stdin_path else subprocess.DEVNULL
             try:
-                proc = subprocess.Popen(cmd, cwd=str(cwd), stdout=subprocess.PIPE, stderr=errf, stdin=subprocess.DEVNULL,
+                proc = subprocess.Popen(cmd, cwd=str(cwd), stdout=subprocess.PIPE, stderr=errf, stdin=stdin,
                                         text=True, encoding="utf-8", errors="replace", env=self.env(),
                                         start_new_session=True, bufsize=1)
             except FileNotFoundError as e:
                 return RunResult(ok=False, exit_code=None, error=f"runner binary not found: {e}", log_path=str(log_path))
+            except OSError as e:  # e.g. E2BIG: report a failed run instead of crashing the caller
+                return RunResult(ok=False, exit_code=None, error=f"runner could not start: {e}", log_path=str(log_path))
+            finally:
+                if stdin_path:
+                    stdin.close()  # the child holds its own descriptor
 
             whole: list[str] = []
 
@@ -132,12 +143,15 @@ class Runner:
             log.write(json.dumps({"rsi": "end", "exit_code": exit_code, "timed_out": timed_out,
                                   "idle_killed": idle_killed, "duration_s": duration}) + "\n")
         final_text = state["final_text"] or "".join(state["text_parts"])
-        ok = (exit_code == 0) and not timed_out and not idle_killed
+        # pi exits 0 after exhausting its own API retries; the last assistant message then stops with "error".
+        api_error = state["stop_reason"] == "error"
+        ok = (exit_code == 0) and not timed_out and not idle_killed and not api_error
         return RunResult(ok=ok, exit_code=exit_code, final_text=final_text, stop_reason=state["stop_reason"],
                          timed_out=timed_out, idle_killed=idle_killed, duration_s=duration, usage=state["usage"],
                          cost_usd=state["cost_usd"], session_id=state["session_id"], num_turns=state["num_turns"],
                          tool_calls=state["tool_calls"], structured=state["structured"], log_path=str(log_path),
-                         error=("timeout" if timed_out else "idle" if idle_killed else ("" if exit_code == 0 else f"exit {exit_code}")))
+                         error=("timeout" if timed_out else "idle" if idle_killed else f"exit {exit_code}" if exit_code != 0
+                                else "model API error after retries" if api_error else ""))
 
     @staticmethod
     def _kill(proc: subprocess.Popen) -> None:
@@ -155,6 +169,9 @@ class Runner:
             pass
 
     # public API -----------------------------------------------------------
+    def _stdin(self, prompt_file: Path) -> Path | None:
+        return prompt_file if self.prompt_on_stdin else None
+
     def run_agent(self, prompt: str, cwd: Path, log_path: Path, *, max_turns: int, timeout_s: float,
                   idle_timeout_s: float, on_event: Callable | None = None) -> RunResult:
         session_dir = log_path.parent / "sessions"
@@ -163,7 +180,8 @@ class Runner:
         prompt_file.write_text(prompt, encoding="utf-8")
         sid = self.new_session_id()
         cmd = self.build_agent_cmd(prompt_file, cwd, max_turns, session_dir, sid)
-        return self._supervise(cmd, cwd, log_path, timeout_s, idle_timeout_s, on_event, session_id=sid)
+        return self._supervise(cmd, cwd, log_path, timeout_s, idle_timeout_s, on_event, session_id=sid,
+                               stdin_path=self._stdin(prompt_file))
 
     def resume_agent(self, session_id: str, prompt: str, cwd: Path, log_path: Path, *, max_turns: int, timeout_s: float,
                      idle_timeout_s: float, on_event: Callable | None = None) -> RunResult:
@@ -171,7 +189,8 @@ class Runner:
         prompt_file = log_path.parent / (log_path.stem + ".prompt.md")
         prompt_file.write_text(prompt, encoding="utf-8")
         cmd = self.build_resume_cmd(session_id, prompt_file, cwd, max_turns, session_dir)
-        return self._supervise(cmd, cwd, log_path, timeout_s, idle_timeout_s, on_event)
+        return self._supervise(cmd, cwd, log_path, timeout_s, idle_timeout_s, on_event,
+                               stdin_path=self._stdin(prompt_file))
 
     def ask_json(self, prompt: str, cwd: Path, log_path: Path, *, schema: dict | None = None,
                  timeout_s: float = 600) -> tuple[Any, RunResult]:
@@ -182,7 +201,7 @@ class Runner:
         prompt_file = log_path.parent / (log_path.stem + ".prompt.md")
         prompt_file.write_text(prompt, encoding="utf-8")
         cmd = self.build_json_cmd(prompt_file, cwd, schema, session_dir)
-        res = self._supervise(cmd, cwd, log_path, timeout_s, timeout_s, None)
+        res = self._supervise(cmd, cwd, log_path, timeout_s, timeout_s, None, stdin_path=self._stdin(prompt_file))
         data = res.structured
         if data is None and res.final_text:
             try:

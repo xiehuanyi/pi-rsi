@@ -4,7 +4,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=$(python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1])")
 TMP=$(mktemp -d)
-python3 "$HERE/tests/mock_openai.py" "$PORT" & MOCK=$!
+MOCK_REQUEST_LOG="$TMP/requests.jsonl" python3 "$HERE/tests/mock_openai.py" "$PORT" & MOCK=$!
 trap 'kill $MOCK 2>/dev/null; rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/agentdir" "$TMP/work" "$TMP/logs"
 cat > "$TMP/agentdir/models.json" <<JSON
@@ -26,4 +26,19 @@ assert out.exists() and out.read_text().strip() == "hello-from-mock", "tool call
 assert "DONE mock" in res.final_text, "final text not captured"
 assert res.tool_calls == 1
 print("TEST OK: pi runner executed a tool call and captured the final message")
+# Research prompts outgrow one argv string (Linux: 128 KiB). The prompt goes through stdin.
+import json
+big = "Context line for a long research snapshot.\n" * 7000 + "BIG-PROMPT-END"
+assert len(big.encode()) > 300_000
+res = r.run_agent(big, cwd=tmp / "work", log_path=tmp / "logs" / "big.jsonl", max_turns=5, timeout_s=120, idle_timeout_s=60)
+assert res.ok, res.error
+start = json.loads((tmp / "logs" / "big.jsonl").read_text().splitlines()[0])
+assert big not in " ".join(start["cmd"]) and start["stdin"].endswith("big.prompt.md"), start
+res = r.resume_agent(res.session_id, "Resume marker RESUME-END", cwd=tmp / "work", log_path=tmp / "logs" / "resume.jsonl",
+                     max_turns=5, timeout_s=120, idle_timeout_s=60)
+assert res.ok, res.error
+requests = [json.loads(line) for line in (tmp / "requests.jsonl").read_text().splitlines()]
+assert any(max(q["user_chars"]) >= len(big.strip()) and q["last_user_tail"].endswith("BIG-PROMPT-END") for q in requests), requests
+assert requests[-1]["last_user_tail"].endswith("RESUME-END") and len(requests[-1]["user_chars"]) >= 2, requests[-1]
+print("TEST OK: a >300 KB prompt and a resumed session reach pi through stdin")
 PY

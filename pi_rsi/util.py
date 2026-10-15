@@ -117,6 +117,13 @@ def parse_json_loose(text: str) -> Any:
     raise ValueError("no JSON found in model output")
 
 
+def as_number(value: Any) -> float | None:
+    """A finite JSON number as float; None for anything else (bools, strings, NaN, missing)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+        return None
+    return float(value)
+
+
 def fmt_score(x: Any) -> str:
     if x is None:
         return "-"

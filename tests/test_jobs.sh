@@ -9,7 +9,7 @@ rm -rf "$EXP" "$RSI_JOBS_DIR"
 [ -d "$HERE/pi_rsi/tasks/toy-longjob/.venv" ] || "$HERE/pi_rsi/tasks/toy-longjob/setup.sh" >/dev/null
 "$HERE/rsi" init "$EXP" --task "$HERE/pi_rsi/tasks/toy-longjob" --runner script --model "$HERE/tests/fake_agent.py" \
   --utility-runner script --utility-model "$HERE/tests/fake_agent.py" --width-root 2 --width 1 --depth 2 --max-nodes 3 \
-  --parallel 2 --patience 10 --node-timeout 120 --idle-timeout 60 --no-narrative --name test_jobs >/dev/null
+  --parallel 2 --patience 10 --node-timeout 120 --idle-timeout 60 --no-narrative --name test_jobs --no-research-loop --no-maintainer >/dev/null
 "$HERE/rsi" run "$EXP" --quiet
 "$HERE/rsi" status "$EXP"
 "$HERE/rsi" jobs | head -12
