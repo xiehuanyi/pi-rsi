@@ -3,7 +3,10 @@
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 Status: v0.1, research prototype. Built and tested on one Linux workstation with the Grok CLI and a pinned
-[pi](https://github.com/earendil-works/pi) 0.85.1. MIT licensed. Experiment write-ups: https://blog.pocketplay.win/rsi/
+[pi](https://github.com/earendil-works/pi) 0.85.1. MIT licensed. Write-ups (English, each with a Chinese version):
+[CASMI26: a biased proxy and its fix](https://blog.pocketplay.win/en/blog/pi-rsi-casmi26-proxy-alignment-20261015/) ·
+[airline experiment and research Wiki](https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/).
+Older notebook (Chinese): https://blog.pocketplay.win/rsi/
 
 ## Overview
 
