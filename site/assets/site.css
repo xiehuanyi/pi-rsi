@@ -1,4 +1,4 @@
-/* Frame for pages migrated from blog.pocketplay.win; page styles come from the original stylesheets. */
+/* Site frame (header and footer bars); page styles come from each page's own stylesheets. */
 :root{--rsi-bar-bg:#f6f4ef;--rsi-bar-fg:#2b2a27;--rsi-bar-line:#e3dfd6;--rsi-bar-link:#3b5bdb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rsi-bar-bg:#1b1c20;--rsi-bar-fg:#e7e5df;--rsi-bar-line:#2e3036;--rsi-bar-link:#8ea5ff}}
 html[data-rsi-legacy]{--rsi-bar-bg:#fafafa;--rsi-bar-fg:#22252a;--rsi-bar-line:#e8e9ec;--rsi-bar-link:#285ea5}

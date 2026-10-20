@@ -16,6 +16,7 @@ import argparse
 import html
 import re
 import shutil
+from html.parser import HTMLParser
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -43,6 +44,63 @@ def external_links(fragment: str, base: str) -> str:
     return re.sub(r'(href|src)="/(?!' + re.escape(base.strip("/")) + r'/)', r'\1="' + OLD + "/", fragment)
 
 
+VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+
+class _Elements(HTMLParser):
+    """Character spans of the elements `drop(tag, attrs, outer_html)` selects."""
+
+    def __init__(self, text, drop):
+        super().__init__(convert_charrefs=False)
+        self.text, self.drop, self.stack, self.spans = text, drop, [], []
+        self.lines = [0]
+        for line in text.split("\n"):
+            self.lines.append(self.lines[-1] + len(line) + 1)
+
+    def _offset(self):
+        line, col = self.getpos()
+        return self.lines[line - 1] + col
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in VOID:
+            self.stack.append((tag, dict(attrs), self._offset()))
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                name, attrs, start = self.stack[i]
+                del self.stack[i:]
+                end = self.text.index(">", self._offset()) + 1
+                if self.drop(name, attrs, self.text[start:end]):
+                    self.spans.append((start, end))
+                return
+
+
+def remove_elements(text: str, drop) -> str:
+    parser = _Elements(text, drop)
+    parser.feed(text)
+    parser.close()
+    out, last = [], 0
+    for start, end in sorted(parser.spans):
+        if start >= last:  # outermost selected element only
+            out.append(text[last:start])
+            last = end
+    return "".join(out) + text[last:]
+
+
+def platform_block(tag: str, attrs: dict, outer: str) -> bool:
+    """PocketPlay furniture inside <main>: breadcrumbs, ads, community prompts, related posts, editorial links."""
+    classes = set((attrs.get("class") or "").split())
+    if classes & {"pp-crumbs", "pp-ad", "bg-cta__ask", "bg-foot", "friend-links", "friend-label"}:
+        return True
+    if tag == "footer" and "friend-links" in outer:  # links to other PocketPlay sites
+        return True
+    if tag == "span" and "pp-badge" in classes and "PocketPlay" in outer:
+        return True
+    return tag == "section" and "pp-section" in classes and (
+        'class="pp-more"' in outer or 'data-accent="community"' in outer or "pocketplay.win/community" in outer)
+
+
 def strip_platform(page: str) -> str:
     """Drop the PocketPlay network bar, analytics and bridge scripts from a standalone page."""
     platform = r'(?:' + re.escape(OLD) + r')?/(?:_pp|_kit|_platform)/'
@@ -55,8 +113,7 @@ def shell(*, lang, title, description, path, base, head, body, alternate=None, s
     home = f"{base}/zh/" if lang.startswith("zh") else f"{base}/"
     switch = (f'<a href="{alternate}" hreflang="{"en" if lang.startswith("zh") else "zh"}">'
               f'{"English" if lang.startswith("zh") else "中文"}</a>') if alternate else ""
-    note = ("最初发表于 PocketPlay 博客，现托管在 GitHub Pages。" if lang.startswith("zh")
-            else "First published on the PocketPlay blog; now hosted on GitHub Pages.")
+    note = "pi-rsi 研究笔记 · 托管于 GitHub Pages" if lang.startswith("zh") else "pi-rsi research notes · hosted on GitHub Pages"
     return f"""<!doctype html>
 <html lang="{lang}"{f' data-pp-site="{site}"' if site else ""}{"" if body_class else " data-rsi-legacy"}>
 <head>
@@ -102,7 +159,11 @@ def migrate_page(src: str, rel: str, base: str) -> str:
         if PLATFORM.search(url) or not OURS.search(url.removeprefix(OLD)):
             continue
         (head if tag.startswith("<link") or m.start() < start else tail).append(rebase(tag, base))
-    main = external_links(rebase(src[start:end], base), base)
+    main = external_links(rebase(remove_elements(src[start:end], platform_block), base), base)
+    main = main.replace(">blog.pocketplay.win<", ">xiehuanyi.github.io<")  # displayed host of migrated sources
+    main = main.replace(f'href="{OLD}/"', f'href="{base}/"')  # breadcrumb root: the new site's home
+    title = re.sub(r"\s*·\s*PocketPlay\s*$", " · pi-rsi", title)
+    description = re.sub(r"\s*·\s*PocketPlay", "", description)
     site = (re.search(r'<html[^>]*\bdata-pp-site="([^"]+)"', src) or [None, ""])[1]
     body_class = (re.search(r'<body[^>]*\bclass="([^"]+)"', src) or [None, ""])[1]
     return shell(lang=lang, title=html.escape(title), description=description, path="/" + rel.removesuffix("index.html"),
@@ -110,7 +171,7 @@ def migrate_page(src: str, rel: str, base: str) -> str:
                  site=site, body_class=body_class)
 
 
-SITE_CSS = """/* Frame for pages migrated from blog.pocketplay.win; page styles come from the original stylesheets. */
+SITE_CSS = """/* Site frame (header and footer bars); page styles come from each page's own stylesheets. */
 :root{--rsi-bar-bg:#f6f4ef;--rsi-bar-fg:#2b2a27;--rsi-bar-line:#e3dfd6;--rsi-bar-link:#3b5bdb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rsi-bar-bg:#1b1c20;--rsi-bar-fg:#e7e5df;--rsi-bar-line:#2e3036;--rsi-bar-link:#8ea5ff}}
 html[data-rsi-legacy]{--rsi-bar-bg:#fafafa;--rsi-bar-fg:#22252a;--rsi-bar-line:#e8e9ec;--rsi-bar-link:#285ea5}
