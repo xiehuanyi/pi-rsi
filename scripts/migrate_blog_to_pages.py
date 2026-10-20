@@ -9,6 +9,9 @@ and their fonts. Each page keeps its <main> and its own assets; the platform she
 account and analytics scripts) is dropped and every link is rebased onto BASE. The output is plain
 static files: no build step runs on the host. Experiment files the blog linked but never served are
 restored from experiments/ when they still exist locally.
+
+This was a one-time move (2026-10-20). site/ is now edited directly (for example, the CASMI26 charts were
+moved into the write-up afterwards); re-running this script overwrites those edits.
 """
 from __future__ import annotations
 
@@ -206,8 +209,7 @@ harness keeps the search tree, the evidence and the research wiki.</p>
 <h2>Write-ups</h2>
 <ul>
 <li><a href="BASE/en/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26: how a biased proxy stalled the search</a><span class="rsi-date">2026-10-15</span>
-<div class="rsi-sub"><span class="rsi-label">Interactive pages:</span>
-<a href="BASE/rsi/interactive/casmi26-newflow-20261015/en/">score chart and search tree</a></div></li>
+</li>
 <li><a href="BASE/en/blog/pi-rsi-airline-20261004/">Airline satisfaction: an experiment and its research wiki</a><span class="rsi-date">2026-10-04</span>
 <div class="rsi-sub"><span class="rsi-label">Interactive pages:</span>
 <a href="BASE/rsi/interactive/airline-20261004/en/">overview</a> · <a href="BASE/rsi/interactive/airline-20261004/en/tree/">search tree</a> ·
@@ -224,8 +226,7 @@ agent 选择并实现假设，冻结的评估器给出官方分数，框架保�
 <h2>文章</h2>
 <ul>
 <li><a href="BASE/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26：有偏的代理指标如何拖住搜索</a><span class="rsi-date">2026-10-15</span>
-<div class="rsi-sub"><span class="rsi-label">交互页面：</span>
-<a href="BASE/rsi/interactive/casmi26-newflow-20261015/zh/">分数曲线与搜索树</a></div></li>
+</li>
 <li><a href="BASE/zh/blog/pi-rsi-airline-20261004/">航空满意度：一次实验与它的研究 Wiki</a><span class="rsi-date">2026-10-04</span>
 <div class="rsi-sub"><span class="rsi-label">交互页面：</span>
 <a href="BASE/rsi/interactive/airline-20261004/zh/">概览</a> · <a href="BASE/rsi/interactive/airline-20261004/zh/tree/">搜索树</a> ·

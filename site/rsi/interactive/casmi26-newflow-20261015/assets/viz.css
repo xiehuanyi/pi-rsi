@@ -42,3 +42,13 @@
 .casmi-tip__meta { font-variant-numeric:tabular-nums; margin-bottom:4px; }
 .casmi-method { margin:8px auto 28px; max-width:960px; }
 @media (pointer:coarse) { .casmi-legend li { min-height:28px; } }
+/* Embedded in the write-up (2026-10-20): figures sit inside .pp-prose and the page has no side rail. */
+.bg-layout:has(.casmi-fig) { grid-template-columns:minmax(0,700px); }
+.casmi-fig { position:relative; margin:28px 0 36px; }
+.casmi-fig figcaption { font-size:14px; line-height:1.6; color:var(--ink-3); margin:0 0 8px; }
+.casmi-fig figcaption strong { color:var(--ink); font-weight:600; }
+.pp-prose .casmi-legend { list-style:none; padding:0; margin:0 0 8px; }
+.pp-prose .casmi-legend li { margin:0; }
+#casmi-chart, #casmi-tree { position:relative; }
+.casmi-tip:not(.is-on) { display:none; }
+#casmi-chart .casmi-svg { min-width:600px; }
