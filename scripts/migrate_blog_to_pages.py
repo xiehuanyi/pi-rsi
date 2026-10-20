@@ -10,8 +10,8 @@ account and analytics scripts) is dropped and every link is rebased onto BASE. T
 static files: no build step runs on the host. Experiment files the blog linked but never served are
 restored from experiments/ when they still exist locally.
 
-This was a one-time move (2026-10-20). site/ is now edited directly (for example, the CASMI26 charts were
-moved into the write-up afterwards); re-running this script overwrites those edits.
+This was a one-time move (2026-10-20). site/ is now edited directly (for example, the CASMI26 and airline charts
+were moved into the write-ups afterwards); re-running this script overwrites those edits.
 """
 from __future__ import annotations
 
@@ -212,7 +212,7 @@ harness keeps the search tree, the evidence and the research wiki.</p>
 </li>
 <li><a href="BASE/en/blog/pi-rsi-airline-20261004/">Airline satisfaction: an experiment and its research wiki</a><span class="rsi-date">2026-10-04</span>
 <div class="rsi-sub"><span class="rsi-label">Interactive pages:</span>
-<a href="BASE/rsi/interactive/airline-20261004/en/">overview</a> · <a href="BASE/rsi/interactive/airline-20261004/en/tree/">search tree</a> ·
+<a href="BASE/rsi/interactive/airline-20261004/en/tree/">full search tree</a> ·
 <a href="BASE/rsi/interactive/airline-20261004/en/wiki/">research wiki</a></div></li>
 </ul>
 <h2>Earlier notebook (Chinese)</h2>
@@ -229,7 +229,7 @@ agent 选择并实现假设，冻结的评估器给出官方分数，框架保�
 </li>
 <li><a href="BASE/zh/blog/pi-rsi-airline-20261004/">航空满意度：一次实验与它的研究 Wiki</a><span class="rsi-date">2026-10-04</span>
 <div class="rsi-sub"><span class="rsi-label">交互页面：</span>
-<a href="BASE/rsi/interactive/airline-20261004/zh/">概览</a> · <a href="BASE/rsi/interactive/airline-20261004/zh/tree/">搜索树</a> ·
+<a href="BASE/rsi/interactive/airline-20261004/zh/tree/">完整搜索树</a> ·
 <a href="BASE/rsi/interactive/airline-20261004/zh/wiki/">研究 Wiki</a></div></li>
 </ul>
 <h2>早期实验笔记</h2>

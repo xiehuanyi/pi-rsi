@@ -20,3 +20,6 @@
 
 .rsi-series-0{background:var(--viz-series-1)}
 .rsi-series-1{background:var(--viz-series-2)}
+/* Embedded in the zh write-up (2026-10-20): single column, figures between prose blocks. */
+.bg-layout:has(.rsi-embed) { grid-template-columns:minmax(0,700px); }
+.rsi-viz.rsi-embed { margin:8px 0 32px; }
