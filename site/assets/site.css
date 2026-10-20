@@ -12,5 +12,9 @@ html[data-rsi-legacy]{--rsi-bar-bg:#fafafa;--rsi-bar-fg:#22252a;--rsi-bar-line:#
 .rsi-foot{border-top:1px solid var(--rsi-bar-line);border-bottom:0;margin-top:48px;font-size:13px}
 .rsi-index{max-width:760px;margin:0 auto;padding:32px 16px;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--rsi-bar-fg)}
 .rsi-index h1{font-size:28px;margin:0 0 8px}.rsi-index h2{font-size:18px;margin:32px 0 8px}
-.rsi-index a{color:var(--rsi-bar-link)}.rsi-index ul{padding-left:20px}.rsi-index li{margin:6px 0}
+.rsi-index a{color:var(--rsi-bar-link)}.rsi-index ul{padding-left:20px}.rsi-index li{margin:14px 0}
 .rsi-index .lede{color:inherit;opacity:.8}
+.rsi-index .rsi-date,.rsi-index .rsi-label{opacity:.6}.rsi-index .rsi-date{margin-left:8px;font-size:14px}
+.rsi-index .rsi-sub{font-size:14px}
+body:has(>main.rsi-index){min-height:100vh;display:flex;flex-direction:column}
+main.rsi-index{flex:1 0 auto;width:100%;box-sizing:border-box}

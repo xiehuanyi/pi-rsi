@@ -185,8 +185,12 @@ html[data-rsi-legacy]{--rsi-bar-bg:#fafafa;--rsi-bar-fg:#22252a;--rsi-bar-line:#
 .rsi-foot{border-top:1px solid var(--rsi-bar-line);border-bottom:0;margin-top:48px;font-size:13px}
 .rsi-index{max-width:760px;margin:0 auto;padding:32px 16px;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--rsi-bar-fg)}
 .rsi-index h1{font-size:28px;margin:0 0 8px}.rsi-index h2{font-size:18px;margin:32px 0 8px}
-.rsi-index a{color:var(--rsi-bar-link)}.rsi-index ul{padding-left:20px}.rsi-index li{margin:6px 0}
+.rsi-index a{color:var(--rsi-bar-link)}.rsi-index ul{padding-left:20px}.rsi-index li{margin:14px 0}
 .rsi-index .lede{color:inherit;opacity:.8}
+.rsi-index .rsi-date,.rsi-index .rsi-label{opacity:.6}.rsi-index .rsi-date{margin-left:8px;font-size:14px}
+.rsi-index .rsi-sub{font-size:14px}
+body:has(>main.rsi-index){min-height:100vh;display:flex;flex-direction:column}
+main.rsi-index{flex:1 0 auto;width:100%;box-sizing:border-box}
 """
 
 FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3b5bdb"/>'
@@ -201,11 +205,13 @@ an automated research harness: agents choose and implement hypotheses, a frozen 
 harness keeps the search tree, the evidence and the research wiki.</p>
 <h2>Write-ups</h2>
 <ul>
-<li><a href="BASE/en/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26: how a biased proxy stalled the search</a> (2026-10-15) —
-<a href="BASE/rsi/interactive/casmi26-newflow-20261015/en/">interactive score chart and search tree</a></li>
-<li><a href="BASE/en/blog/pi-rsi-airline-20261004/">Airline satisfaction: an experiment and its research wiki</a> (2026-10-04) —
-<a href="BASE/rsi/interactive/airline-20261004/en/">overview</a>, <a href="BASE/rsi/interactive/airline-20261004/en/tree/">search tree</a>,
-<a href="BASE/rsi/interactive/airline-20261004/en/wiki/">research wiki</a></li>
+<li><a href="BASE/en/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26: how a biased proxy stalled the search</a><span class="rsi-date">2026-10-15</span>
+<div class="rsi-sub"><span class="rsi-label">Interactive pages:</span>
+<a href="BASE/rsi/interactive/casmi26-newflow-20261015/en/">score chart and search tree</a></div></li>
+<li><a href="BASE/en/blog/pi-rsi-airline-20261004/">Airline satisfaction: an experiment and its research wiki</a><span class="rsi-date">2026-10-04</span>
+<div class="rsi-sub"><span class="rsi-label">Interactive pages:</span>
+<a href="BASE/rsi/interactive/airline-20261004/en/">overview</a> · <a href="BASE/rsi/interactive/airline-20261004/en/tree/">search tree</a> ·
+<a href="BASE/rsi/interactive/airline-20261004/en/wiki/">research wiki</a></div></li>
 </ul>
 <h2>Earlier notebook (Chinese)</h2>
 <p>First experiments with the original tree scheduler (Kaggriculture, House Prices, Spaceship Titanic):
@@ -217,11 +223,13 @@ harness keeps the search tree, the evidence and the research wiki.</p>
 agent 选择并实现假设，冻结的评估器给出官方分数，框架保存搜索树、证据和研究 Wiki。</p>
 <h2>文章</h2>
 <ul>
-<li><a href="BASE/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26：有偏的代理指标如何拖住搜索</a>（2026-10-15）——
-<a href="BASE/rsi/interactive/casmi26-newflow-20261015/zh/">交互式分数曲线与搜索树</a></li>
-<li><a href="BASE/zh/blog/pi-rsi-airline-20261004/">航空满意度：一次实验与它的研究 Wiki</a>（2026-10-04）——
-<a href="BASE/rsi/interactive/airline-20261004/zh/">概览</a>、<a href="BASE/rsi/interactive/airline-20261004/zh/tree/">搜索树</a>、
-<a href="BASE/rsi/interactive/airline-20261004/zh/wiki/">研究 Wiki</a></li>
+<li><a href="BASE/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/">CASMI26：有偏的代理指标如何拖住搜索</a><span class="rsi-date">2026-10-15</span>
+<div class="rsi-sub"><span class="rsi-label">交互页面：</span>
+<a href="BASE/rsi/interactive/casmi26-newflow-20261015/zh/">分数曲线与搜索树</a></div></li>
+<li><a href="BASE/zh/blog/pi-rsi-airline-20261004/">航空满意度：一次实验与它的研究 Wiki</a><span class="rsi-date">2026-10-04</span>
+<div class="rsi-sub"><span class="rsi-label">交互页面：</span>
+<a href="BASE/rsi/interactive/airline-20261004/zh/">概览</a> · <a href="BASE/rsi/interactive/airline-20261004/zh/tree/">搜索树</a> ·
+<a href="BASE/rsi/interactive/airline-20261004/zh/wiki/">研究 Wiki</a></div></li>
 </ul>
 <h2>早期实验笔记</h2>
 <p>最初的树调度器上的实验（Kaggriculture、House Prices、Spaceship Titanic）：
