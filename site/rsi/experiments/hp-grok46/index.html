@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN" data-rsi-legacy>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hp-grok46 · Research notes</title>
+<meta name="description" content="kaggle-house-prices · worker grok:grok-4.6 (xhigh) · finished (max_nodes)">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/experiments/hp-grok46/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/style.css">
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main"><div class="breadcrumbs" aria-label="当前位置"><a href="https://blog.pocketplay.win/">Research notebook</a><span>/</span><a href="/pi-rsi/rsi/">RSI</a><span>/</span><a href="/pi-rsi/rsi/experiments/">实验日志</a><span>/</span><a href="/pi-rsi/rsi/experiments/hp-grok46/">hp-grok46</a></div><article><h1>hp-grok46</h1>
+<p>kaggle-house-prices · worker grok:grok-4.6 (xhigh) · finished (max_nodes)</p>
+<p><a href="/pi-rsi/rsi/runs/hp-grok46/">打开交互式搜索树</a> · <a href="/pi-rsi/files/rsi/runs/hp-grok46/REPORT.md">REPORT.md</a> · <a href="/pi-rsi/files/rsi/runs/hp-grok46/INSIGHTS.md">INSIGHTS.md</a> · <a href="/pi-rsi/files/rsi/runs/hp-grok46/DEADENDS.md">DEADENDS.md</a> · <a href="/pi-rsi/files/rsi/runs/hp-grok46/rsi.toml">rsi.toml</a></p>
+<h2>叙述</h2>
+<p>本次任务是 Kaggle House Prices，官方指标为 RMSLE（越低越好）。搜索配置为 <code>width_root=3</code>、<code>width=2</code>、<code>depth=4</code>、<code>max_nodes=10</code>、<code>parallel=2</code>、<code>patience=4</code>，因达到节点上限停机，耗时约 1 小时 02 分。根节点是仅用少量数值特征的 Ridge 基线，官方分为 0.1836。</p>
+<p>搜索先从三类根分支切入：全量表征上的 LightGBM（<code>n001</code>，0.1418）、宽特征正则线性模型（<code>n002</code>，0.1422）、以及原生类别 CatBoost（<code>n003</code>，0.1438）。三者都说明 Ames 房价依赖稀疏的区位、品质与面积交互，非线性树或充分展开的线性特征远优于 8 列起步代码。随后在最强起点 <code>n001</code> 上做对数空间等权融合：LGBM+XGB+CatBoost（<code>n004</code>，0.1389）再并入 Ridge（<code>n006</code>，0.1369），最后只加固 Ridge 一侧的面积截断与廉价超大屋拟合剔除（<code>n008</code>，0.1358）。这条路径胜出，是因为树模型抓住了非线性主信号，而 Ridge 在普通样本上提供部分互补残差；但未稳健化时，廉价“宫殿”行会把线性项推到百万美元量级，拖垮难折。<code>n008</code> 用训练集 99 分位封顶 <code>GrLivArea</code>/<code>TotalBsmtSF</code>/<code>1stFlrSF</code>/<code>TotalSF</code>，并把 <code>BsmtFinSF1</code> 钳到地下室总面积上限，同时仅从 Ridge 拟合中丢掉 Edwards/廉价超大屋，树仍见全量数据——这样既压住杠杆，又保留预测时的保护。</p>
+<p>未走通的路主要卡在同一机制：只做训练集异常剔除或堆浴室/门廊/品质×面积特征（<code>n005</code>、<code>n007</code>）会在 holdout 上变差（官方分别到 0.1452、0.1477），因为同类目标仍在评估集里；全局 OOF 权重（<code>n009</code>，0.1368）几乎不动，相关 OOF 列容易过拟合；只封居住面积却不钳 <code>BsmtFinSF1</code>，线性预测仍可爆到约百万。等权三树融合官方只降约 0.0029，残差高度相关。</p>
+<p>当前最优官方分为 0.1358，相对基线 0.1836 明显进步，但距公开榜参考约 0.12 仍有约 0.016 差距；独立 <code>kaggle</code> seed 上 worker 报告快测最优约 0.1166，<code>n008</code> 的 worker 快测为 0.11638。较有希望的下一步：仅对 Ridge 再 winsorize <code>LotArea</code>/<code>LotFrontage</code>；在稳健化后的四成员上重试非负 OOF 权重；以及消融“仅 Ridge 丢行”，确认 99 分位封顶才是对 holdout 安全的关键。</p>
+<h2>结果</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>指标</td>
+<td><code>score</code>，lower is better</td>
+</tr>
+<tr>
+<td>baseline（root）</td>
+<td>0.1836</td>
+</tr>
+<tr>
+<td>最佳节点（validation）</td>
+<td>0.1358（<code>n008</code>）</td>
+</tr>
+<tr>
+<td>最佳节点（kaggle，held-out）</td>
+<td>0.1166</td>
+</tr>
+<tr>
+<td>参考 solid_public_lb</td>
+<td>0.12</td>
+</tr>
+<tr>
+<td>节点 完成/失败</td>
+<td>10/0</td>
+</tr>
+<tr>
+<td>搜索参数</td>
+<td>width_root 3, width 2, depth 4, max_nodes 10, parallel 2, patience 4</td>
+</tr>
+<tr>
+<td>总耗时</td>
+<td>1h02m</td>
+</tr>
+<tr>
+<td>token 输入/输出</td>
+<td>2,000,147 / 276,704（CLI 估算成本 $1.81）</td>
+</tr>
+</tbody></table>
+<h2>最佳路径</h2>
+<ul>
+<li><code>root</code> 0.1836 — <strong>baseline</strong>：Baseline starter code. Official score: 0.1836.</li>
+<li><code>n001</code> 0.1418 — <strong>LightGBM on full tabular features with ordinal/NA handling</strong>：Replaced 8-feature ridge with LightGBM on 84 tabular features (ordinal maps, train medians, UNK label cats, TotalSF/Age/RemodAge). Official validation RMSLE 0.1418 (n=293, std 0.1107, sem 0.014) vs parent 0.1836; |Δ|=0.0418 below the 0.05564 bar. Worker quick-set: 0.12694 vs ridge quick 0.16778.</li>
+<li><code>n004</code> 0.1389 — <strong>LGBM+XGB+CatBoost log-space blend</strong>：Equal-weight LGBM+XGB+CatBoost log-space blend on unchanged TabularFeatures. Official validation RMSLE 0.13889 vs parent 0.1418 (Δ=−0.00291). Worker quick-set: 0.12053 vs parent quick 0.12694 (all five folds down; hard fold barely moved).</li>
+<li><code>n006</code> 0.1369 — <strong>Add Ridge as fourth blend member</strong>：Added Ridge (alpha grid 1–1000 on one-hot cats + log1p areas) as a fourth equal-weight log-space blend member with unchanged LGBM+XGB+CatBoost. Official validation RMSLE 0.1369 vs parent 0.1389 (Δ −0.0020). Worker’s quick-set: 0.11896 vs parent 0.12053; folds 0–3 improved, fold 4 worsened.</li>
+<li><code>n008</code> 0.1358 — <strong>Robustify Ridge areas / Edwards</strong>：Ridge-only change: train-99th caps on GrLivArea/TotalBsmtSF/1stFlrSF/TotalSF with BsmtFinSF1 clipped to the TotalBsmtSF cap, plus Ridge-fit drop of Edwards/cheap GrLivArea&gt;4000; trees and equal 1/4 blend unchanged. Official validation RMSLE 0.13578 vs parent 0.1369 (Δ −0.00112). Worker quick-set 0.11638 vs parent quick 0.11896.</li>
+</ul>
+<h2>所有节点</h2>
+<table>
+<thead>
+<tr>
+<th>id</th>
+<th>parent</th>
+<th>深度</th>
+<th>状态</th>
+<th>分数</th>
+<th>Δparent</th>
+<th>假设</th>
+<th>用时</th>
+<th>文件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>root</td>
+<td>-</td>
+<td>0</td>
+<td>baseline</td>
+<td>0.1836</td>
+<td>-</td>
+<td>baseline</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr>
+<td>n001</td>
+<td>root</td>
+<td>1</td>
+<td>no_change</td>
+<td>0.1418</td>
+<td>0.04179</td>
+<td>LightGBM on full tabular features with ordinal/NA handling</td>
+<td>6m42s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n001/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n001/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n001/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n002</td>
+<td>root</td>
+<td>1</td>
+<td>improved</td>
+<td>0.1422</td>
+<td>0.04135</td>
+<td>Wide regularized linear model: ordinal + one-hot + log areas</td>
+<td>9m04s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n002/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n002/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n002/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n003</td>
+<td>root</td>
+<td>1</td>
+<td>improved</td>
+<td>0.1438</td>
+<td>0.0398</td>
+<td>CatBoost native categoricals with minimal FE</td>
+<td>9m01s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n003/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n003/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n003/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n004</td>
+<td>n001</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.1389</td>
+<td>0.00291</td>
+<td>LGBM+XGB+CatBoost log-space blend</td>
+<td>5m30s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n004/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n004/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n004/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n005</td>
+<td>n004</td>
+<td>3</td>
+<td>no_change</td>
+<td>0.1452</td>
+<td>-0.00635</td>
+<td>Ames extras + Edwards outliers</td>
+<td>9m10s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n005/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n005/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n005/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n006</td>
+<td>n004</td>
+<td>3</td>
+<td>no_change</td>
+<td>0.1369</td>
+<td>0.00199</td>
+<td>Add Ridge as fourth blend member</td>
+<td>12m37s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n006/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n006/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n006/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n007</td>
+<td>n001</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.1477</td>
+<td>-0.00586</td>
+<td>Bath/porch/QualArea features and Edwards outliers</td>
+<td>7m00s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n007/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n007/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n007/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n008</td>
+<td>n006</td>
+<td>4</td>
+<td>no_change</td>
+<td>0.1358</td>
+<td>0.00112</td>
+<td>Robustify Ridge areas / Edwards</td>
+<td>17m35s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n008/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n008/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n008/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n009</td>
+<td>n006</td>
+<td>4</td>
+<td>no_change</td>
+<td>0.1368</td>
+<td>0.00014</td>
+<td>OOF-tuned 4-member weights</td>
+<td>14m06s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n009/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n009/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n009/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n010</td>
+<td>n002</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.1367</td>
+<td>0.0055</td>
+<td>Cap Ames area outliers for linear model</td>
+<td>17m03s</td>
+<td><a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n010/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n010/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/hp-grok46/nodes/n010/PROGRESS.md">progress</a></td>
+</tr>
+</tbody></table>
+<h2>Insights（审计员从各节点核实后记录）</h2>
+<ul>
+<li>Full mixed-type tabular features plus log1p LightGBM beat a tiny numeric ridge on Ames because neighborhood/quality/area signals are sparse and nonlinear. [n001, score 0.1418]</li>
+<li>Monotone ordinal quality encodings (NA→0) let trees use quality gradients without treating Ex/Gd/TA as unordered labels. [n001, score 0.1418]</li>
+<li>TotalSF (basement+floors) dominated split gain over raw area proxies; Age/RemodAge also mattered. [n001, score 0.1418]</li>
+<li>Neighborhood one-hots plus ordinal quality/condition maps let a log-target linear model capture location and finish premia the 8-column ridge missed, cutting official RMSLE from 0.1836 to 0.14224. [n002, score 0.1422]</li>
+<li>Wide ~110-feature matrices need stronger Ridge regularization than alpha≤100; GCV sat on the cap until the grid was extended to 1–1000 (chosen ~200). [n002, score 0.1422]</li>
+<li>On this feature set ElasticNetCV ≈ Ridge (worker quick means 0.12966 vs 0.13125; l1_ratio stuck at 0.1), so L1 adds little once dummies are regularized. [n002, score 0.1422]</li>
+<li>Equal log-space averaging of three similar GBDTs can improve every quick fold yet shrink to a tiny holdout gain (official Δ=−0.00291), because the models’ residuals stay highly correlated. [n004, score 0.1389]</li>
+<li>The hardest quick fold barely moved (worker −0.00187), so complementary leaf/depth/cat biases alone do not fix Ames outlier houses. [n004, score 0.1389]</li>
+<li>Native CatBoost categoricals on Ames mixed fields plus TotalSF/Age and a log1p target cut official RMSLE from 0.1836 to 0.14379 versus size-only ridge because ordered target stats use neighborhood/quality the linear baseline never saw. [n003, score 0.1438]</li>
+<li>Worker quick-set moved the same way as validation (0.12187 vs ridge 0.16778), so the quick seed set tracked the official direction for this swap. [n003, score 0.1438]</li>
+<li>Training-only outlier drops can improve quick CV while hurting holdout if similar cheap palaces remain as prediction targets (quick −0.00235 vs official 0.14524 &gt; parent 0.1389). [n005, score 0.1452]</li>
+<li>Aggregated bath/porch/quality×size features plus dropping zero-gain flags give only modest fold moves; they do not fix ~3× overprediction of cheap large homes when those rows stay in the eval set. [n005, score 0.1452]</li>
+<li>Partial log-residual correlation (~0.8) between a GBDT blend and Ridge means a 1/4 linear vote can help ordinary houses without delivering large mean RMSLE cuts. [n006, score 0.1369]</li>
+<li>Under equal weights, one fold where Ridge fails (high residual corr, weak alpha) can erase typical-fold gains and raise fold std. [n006, score 0.1369]</li>
+<li>CatBoost alone nearly matching the 3-tree blend implies weaker trees add little under equal averaging once a strong member dominates. [n006, score 0.1369]</li>
+<li>Train-only cheap-palace drops do not fix the same pattern at prediction time: Id 1299 stayed ~3× overpredicted when it was validation, so holdout twins can erase quick gains. [n007, score 0.1477]</li>
+<li>High train split gain for QualArea/TotalPorchSF did not translate to a clear official win versus parent 0.1418. [n007, score 0.1477]</li>
+<li>Inner OOF NNLS beating equal blend on train OOF does not imply outer gains: the 4-parameter simplex overfits correlated OOF columns and fails under train/predict shift. [n009, score 0.1368]</li>
+<li>A single global Ridge weight cannot handle both regimes: when the hard tail is held out, NNLS upweights Ridge on typical houses and hurts the held-out tail. [n009, score 0.1368]</li>
+<li>Living-area caps alone do not tame Ridge palace leverage when BsmtFinSF1 stays uncapped; Id 1299’s finished basement still drove ~1e6 preds until clipped to the TotalBsmtSF cap. [n008, score 0.1358]</li>
+<li>Dropping cheap/Edwards palaces from Ridge fit (not trees) improves other folds and luxury underprediction, but without predict-time caps fold-4 ridge stays ~0.17 when the palace is a target. [n008, score 0.1358]</li>
+<li>Equal-weight blend gains when Ridge stops casting a million-dollar vote even if trees still ~3–4× overpredict the cheap palace. [n008, score 0.1358]</li>
+<li>Cap finished-basement channels with TotalBsmtSF on palace rows: worker in-process showed uncapped BsmtFinSF1 as the largest log-price term on Id 1299. [n010, score 0.1367]</li>
+<li>Neighborhood/sale-condition-masked caps beat global ones: global p99 undercuts ordinary luxury; living-4000 alone left the palace fold high. [n010, score 0.1367]</li>
+<li>Do not drop train cheap-palaces when a held-out twin may appear: drop cannot fix folds that already hold the palace out and removes the only clipped training exemplar. [n010, score 0.1367]</li>
+</ul>
+<h2>Dead ends</h2>
+<ul>
+<li>HasGarage and HasBsmt added no LightGBM split gain on a full-public-train fit (redundant with GarageArea/TotalBsmtSF); kept but not valuable without an ablation. [n001]</li>
+<li>RidgeCV alphas 1–100: GCV always chose the upper bound 100 on the wide feature matrix; not usable without widening the grid. [n002]</li>
+<li>ElasticNetCV vs Ridge on the same quick folds: delta 0.0016 ≪ fold std 0.024, so switching models was not justified. [n002]</li>
+<li>Equal-weight LGBM+XGB+CatBoost log blend with no feature or weight changes: official 0.13889 vs parent 0.1418 (|Δ|=0.00291 &lt; 0.04203) — not a meaningful holdout win despite worker quick −0.00641. [n004]</li>
+<li>Bundle of Ames extras + Edwards/cheap GrLivArea&gt;4000 train drop: official score 0.14524 vs parent 0.1389 (no meaningful gain). [n005]</li>
+<li>QualGrLiv/extras do not rescue cheap-palace predictions (worker: Id 1299 still ~3.4× high on quick fold 4). [n005]</li>
+<li>Equal 1/4 log-space blend with un-robustified Ridge: official Δ −0.0020 vs parent 0.1389 is within |δ|&lt;0.04451; worker’s quick Δ −0.00157 ≪ fold std. [n006]</li>
+<li>LGBM extras (TotalBath/TotalPorchSF/QualArea) plus Edwards train drop: official 0.14766 vs parent 0.1418 (no meaningful improvement; same directional failure mode as n005). [n007]</li>
+<li>Global OOF NNLS simplex weights on the un-robustified 4-member log blend: worker quick 0.12070 vs 0.11896 (Δ +0.00174, fold 4 +0.00830); official validation flat at 0.13676 vs 0.1369. [n009]</li>
+<li>Cap named areas at 4000 (or max(4000,p99)) without BsmtFinSF1 consistency: worker ridge-only fold 4 ~0.168, Id 1299 still ~1.08e6. [n008]</li>
+<li>Drop-only, no caps: ridge mean improves but fold 4 stays 0.16959 and Id 1299 stays ~1.12e6 (n005-style holdout risk). [n008]</li>
+<li>99th on the four named columns without BsmtFinSF1 clip: fold-4 ridge 0.16405, Id 1299 still ~996k. [n008]</li>
+<li>Global living-4000 + LotArea/GarageArea p99 only: worker in-process mean 0.12905, fold 4 0.16874, Id 1299 still ~6.85×. [n010]</li>
+<li>Global p99 on listed area cols: worker in-process fold 4 ~0.163 with Id 1183 ratio ~0.35 (luxury flattened). [n010]</li>
+<li>Cheap-palace train drop: no fold-4 change when Id 1299 is already held out. [n010]</li>
+</ul>
+</article><footer><div class="friend-label">友情链接</div><div class="friend-links"><a href="https://cats.pocketplay.win/" target="_blank" rel="noopener noreferrer">五只小猫一场戏</a> <a href="https://pocketplay.win/play/sheepdog-meadow/" target="_blank" rel="noopener noreferrer">无能的小狗</a> <a href="https://pocketplay.win/play/lily-hop/" target="_blank" rel="noopener noreferrer">大蛤蟆</a> <a href="https://pocketplay.win/" target="_blank" rel="noopener noreferrer">PocketPlay</a></div></footer></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>最初发表于 PocketPlay 博客，现托管在 GitHub Pages。</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

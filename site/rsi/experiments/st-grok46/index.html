@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN" data-rsi-legacy>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>st-grok46 · Research notes</title>
+<meta name="description" content="kaggle-spaceship-titanic · worker grok:grok-4.6 (xhigh) · finished (patience)">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/experiments/st-grok46/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/style.css">
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main"><div class="breadcrumbs" aria-label="当前位置"><a href="https://blog.pocketplay.win/">Research notebook</a><span>/</span><a href="/pi-rsi/rsi/">RSI</a><span>/</span><a href="/pi-rsi/rsi/experiments/">实验日志</a><span>/</span><a href="/pi-rsi/rsi/experiments/st-grok46/">st-grok46</a></div><article><h1>st-grok46</h1>
+<p>kaggle-spaceship-titanic · worker grok:grok-4.6 (xhigh) · finished (patience)</p>
+<p><a href="/pi-rsi/rsi/runs/st-grok46/">打开交互式搜索树</a> · <a href="/pi-rsi/files/rsi/runs/st-grok46/REPORT.md">REPORT.md</a> · <a href="/pi-rsi/files/rsi/runs/st-grok46/INSIGHTS.md">INSIGHTS.md</a> · <a href="/pi-rsi/files/rsi/runs/st-grok46/DEADENDS.md">DEADENDS.md</a> · <a href="/pi-rsi/files/rsi/runs/st-grok46/rsi.toml">rsi.toml</a></p>
+<h2>叙述</h2>
+<p>本次实验面向 Kaggle Spaceship Titanic，以官方验证准确率 <code>score</code>（越高越好）为优化目标。搜索在约 37 分 47 秒后因耐心阈值停止，共探索 16 个节点量级的树（宽度根 3、宽度 2、深度 4、并行 2）。根节点基线为 0.7717；最终最优节点是 <code>n008</code>，官方分为 0.8189，已略高于公开榜参考水平 solid_public_lb 0.81，held-out <code>kaggle</code> 种子集上最优为 0.8034。</p>
+<p>真正拉开差距的是第一层从逻辑回归换到 LightGBM，并加入舱位甲板/编号/舷侧、团体规模与消费相关特征：<code>n001</code> 官方分直接到 0.8177。机制上，树模型能吃到甲板、舷侧、冷冻睡眠与消费长尾的非线性交互；同时把“有消费则不可能处于 CryoSleep”这类硬约束写进特征，也能理顺训练里约百行的矛盾。后续路径几乎都在这条 LightGBM 主干上打补丁：团体内缺失填充与甲板→星球映射（<code>n004</code>）、姓氏频率与舱位占用（<code>n006</code>），再到 <code>n008</code> 把剩余零消费的 CryoSleep 缺失填为 True，并加入奢侈消费占比与餐饮购物占比。官方验证上 <code>n008</code> 相对父节点 <code>n006</code> 的 0.8166 仅再抬约 0.0023，仍落在噪声带内，但成为整棵搜索里最高的官方分；worker 快速集上为 0.80748，相对未改动父节点快速分 0.80417 约 +0.00331，且五折全升。</p>
+<p>未站住的方向同样清晰。团体运输率先验与固定概率混合（<code>n003</code>）在按团体划分、训练/测试团体不重叠时，预测端会塌成全局均值，无法把组内相关带到未见团体。全局姓氏计数容易跨团体干扰舱位信号；舱位占用与团体规模高度冗余。宽泛的位置填充、组内共享标志、更深 HGB 或线性模型，要么官方不升，要么只在 worker 快速集上有小幅抖动却带不走验证。同思路的花费占比在另一条支路（<code>n009</code>）甚至会因与已有 log1p 消费列共线而失效，说明特征价值依赖整条特征栈，而非单点技巧。</p>
+<p>相对 0.81 的公开参考，当前最优已略超；相对更强公共方案仍可能只是小数点后第三位的空间。较有希望的下一步是：在保留 <code>n008</code> 冷冻填充与花费占比的前提下剔除易过拟合的整数 GroupId；用组内同姓计数替换全局 LastNameSize；并消融 LastNameSize/CabinOccupancy，确认它们是否只是在拖累已接近天花板的 LightGBM 栈。</p>
+<h2>结果</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>指标</td>
+<td><code>score</code>，higher is better</td>
+</tr>
+<tr>
+<td>baseline（root）</td>
+<td>0.7717</td>
+</tr>
+<tr>
+<td>最佳节点（validation）</td>
+<td>0.8189（<code>n008</code>）</td>
+</tr>
+<tr>
+<td>最佳节点（kaggle，held-out）</td>
+<td>0.8034</td>
+</tr>
+<tr>
+<td>参考 solid_public_lb</td>
+<td>0.81</td>
+</tr>
+<tr>
+<td>节点 完成/失败</td>
+<td>14/0</td>
+</tr>
+<tr>
+<td>搜索参数</td>
+<td>width_root 3, width 2, depth 4, max_nodes 16, parallel 2, patience 5</td>
+</tr>
+<tr>
+<td>总耗时</td>
+<td>37m47s</td>
+</tr>
+<tr>
+<td>token 输入/输出</td>
+<td>2,925,114 / 359,335（CLI 估算成本 $2.46）</td>
+</tr>
+</tbody></table>
+<h2>最佳路径</h2>
+<ul>
+<li><code>root</code> 0.7717 — <strong>baseline</strong>：Baseline starter code. Official score: 0.7717.</li>
+<li><code>n001</code> 0.8177 — <strong>Gradient boosting + cabin/group features</strong>：Switched from logistic regression to LightGBM with cabin deck/num/side, group id/size, categoricals, log1p spends, Age median, and CryoSleep-from-spend. Official validation score 0.81771 (n=1739) vs parent 0.7717 (+0.046). Worker quick-set: 0.80331 vs baseline quick 0.76335.</li>
+<li><code>n004</code> 0.8137 — <strong>Group-consistent missing imputation</strong>：Added per-frame unique group-mate fill for HomePlanet/Cabin/Destination plus hard deck→planet map (A/B/C/T→Europa, G→Earth) in LightGBM features. Official validation score 0.81369 (n=1739, sem=0.00934) vs parent 0.8177 (Δ−0.00401). Worker&#39;s quick-set: 0.80331→0.80732.</li>
+<li><code>n006</code> 0.8166 — <strong>Surname and cabin occupancy</strong>：Added per-frame LastNameSize and CabinOccupancy to LightGBM features. Official validation score 0.81656 (n=1739, sem=0.00928) vs parent 0.8137; |Δ|=0.00286 within noise. Worker&#39;s quick-set: 0.80417 vs untouched parent 0.80732 (Δ=−0.00315).</li>
+<li><code>n008</code> 0.8189 — <strong>CryoSleep remaining NA and spend mix</strong>：Added CryoSleep NA→True when spend=0 plus LuxuryShare and FoodShopShare in features.py; LightGBM unchanged. Official validation score 0.81886 (n=1739, sem=0.00924) vs parent 0.8166 (Δ+0.00226, within no_change band). Worker quick-set: 0.80748 vs untouched parent 0.80417 (+0.00331).</li>
+</ul>
+<h2>所有节点</h2>
+<table>
+<thead>
+<tr>
+<th>id</th>
+<th>parent</th>
+<th>深度</th>
+<th>状态</th>
+<th>分数</th>
+<th>Δparent</th>
+<th>假设</th>
+<th>用时</th>
+<th>文件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>root</td>
+<td>-</td>
+<td>0</td>
+<td>baseline</td>
+<td>0.7717</td>
+<td>-</td>
+<td>baseline</td>
+<td>-</td>
+<td></td>
+</tr>
+<tr>
+<td>n001</td>
+<td>root</td>
+<td>1</td>
+<td>improved</td>
+<td>0.8177</td>
+<td>0.046</td>
+<td>Gradient boosting + cabin/group features</td>
+<td>5m55s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n001/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n001/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n001/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n002</td>
+<td>root</td>
+<td>1</td>
+<td>improved</td>
+<td>0.8125</td>
+<td>0.04083</td>
+<td>CryoSleep-consistent spend imputation + rules</td>
+<td>12m23s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n002/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n002/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n002/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n003</td>
+<td>root</td>
+<td>1</td>
+<td>improved</td>
+<td>0.8016</td>
+<td>0.0299</td>
+<td>Group-level transported prior features</td>
+<td>12m10s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n003/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n003/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n003/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n004</td>
+<td>n001</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.8137</td>
+<td>-0.00402</td>
+<td>Group-consistent missing imputation</td>
+<td>9m58s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n004/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n004/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n004/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n005</td>
+<td>n001</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.8097</td>
+<td>-0.00805</td>
+<td>Surname and cabin occupancy counts</td>
+<td>8m30s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n005/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n005/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n005/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n006</td>
+<td>n004</td>
+<td>3</td>
+<td>no_change</td>
+<td>0.8166</td>
+<td>0.00287</td>
+<td>Surname and cabin occupancy</td>
+<td>8m13s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n006/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n006/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n006/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n007</td>
+<td>n006</td>
+<td>4</td>
+<td>no_change</td>
+<td>0.8148</td>
+<td>-0.00172</td>
+<td>Within-group family flag</td>
+<td>6m55s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n007/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n007/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n007/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n008</td>
+<td>n006</td>
+<td>4</td>
+<td>no_change</td>
+<td>0.8189</td>
+<td>0.0023</td>
+<td>CryoSleep remaining NA and spend mix</td>
+<td>8m00s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n008/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n008/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n008/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n009</td>
+<td>n004</td>
+<td>3</td>
+<td>no_change</td>
+<td>0.8108</td>
+<td>-0.00288</td>
+<td>CryoSleep remaining NA and spend mix</td>
+<td>6m44s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n009/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n009/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n009/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n010</td>
+<td>n002</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.8079</td>
+<td>-0.0046</td>
+<td>Group size, cabin side, within-group sharing</td>
+<td>15m17s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n010/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n010/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n010/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n011</td>
+<td>n002</td>
+<td>2</td>
+<td>no_change</td>
+<td>0.8068</td>
+<td>-0.00575</td>
+<td>Luxury vs essential spend and IsChild</td>
+<td>11m34s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n011/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n011/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n011/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n012</td>
+<td>n009</td>
+<td>4</td>
+<td>no_change</td>
+<td>0.8154</td>
+<td>0.0046</td>
+<td>Ablate integer GroupId</td>
+<td>5m29s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n012/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n012/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n012/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n013</td>
+<td>n009</td>
+<td>4</td>
+<td>improved</td>
+<td>0.8183</td>
+<td>0.00748</td>
+<td>F-deck leftover HomePlanet from spend mix</td>
+<td>12m24s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n013/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n013/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n013/PROGRESS.md">progress</a></td>
+</tr>
+<tr>
+<td>n014</td>
+<td>n005</td>
+<td>3</td>
+<td>no_change</td>
+<td>0.8148</td>
+<td>0.00518</td>
+<td>Group-consistent missing imputation</td>
+<td>7m35s</td>
+<td><a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n014/HANDOFF.md">handoff</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n014/SUMMARY.md">summary</a> <a href="/pi-rsi/files/rsi/runs/st-grok46/nodes/n014/PROGRESS.md">progress</a></td>
+</tr>
+</tbody></table>
+<h2>Insights（审计员从各节点核实后记录）</h2>
+<ul>
+<li>GBDT on cabin/group + spend features beats linear spend/age/CryoSleep because trees capture non-linear deck/side/cryo and spend-tail interactions. [n001, score 0.8177]</li>
+<li>Forcing CryoSleep=False when any spend&gt;0 removes a real train contradiction (~100 rows) and clarifies the cryo–transport signal. [n001, score 0.8177]</li>
+<li>GroupSize and Deck/Side are strong tabular levers on this task; fixed 500 trees at lr=0.05 already landed in the hypothesized 0.80–0.81 band. [n001, score 0.8177]</li>
+<li>CryoSleep=True always has zero amenity spend, and missing CryoSleep splits by spend like awake vs cryo, so spend-based Cryo imputation aligns features with a hard domain rule. [n002, score 0.8125]</li>
+<li>Under the same cryo/one-hot features, logistic regression gains little (worker quick +0.006) while depth-3 HGB captures spend×planet/deck interactions and drives most of the lift. [n002, score 0.8125]</li>
+<li>Worker same-fold probes show cryo rules add only ~0.001–0.004 once HGB is used on baseline columns, so the booster—not imputation alone—explains most of the jump. [n002, score 0.8125]</li>
+<li>With group-aware CV and zero train/test group overlap, LOO group label priors collapse to the global mean at predict, so they cannot transfer the within-group outcome dependence they encode on train. [n003, score 0.8016]</li>
+<li>Most of the jump from worker quick-set 0.76 to 0.80 came from LightGBM plus GroupSize and group-filled planet/cabin location features, not from GroupTransportedMean. [n003, score 0.8016]</li>
+<li>A fixed predict-time blend of row probabilities toward the in-batch group mean is the only label-free way to use outcome correlation on unseen groups, but fixed weights 0.30/0.50 stayed inside fold noise. [n003, score 0.8016]</li>
+<li>Unique-only group fill plus hard A/B/C/T/G deck→planet cuts HomePlanet NA a lot (worker: 152→49) but ~55% singletons only get the deck map, so location NA-fill has limited leverage. [n004, score 0.8137]</li>
+<li>A worker quick-set lift of +0.004 below fold std (~0.008) did not carry to official validation—treat small quick gains on location imputation as noise unless validation moves. [n004, score 0.8137]</li>
+<li>Destination is mixed in many multi-groups; unique-only Destination fill barely moves score (worker ablation −0.00058) and is not the driver. [n004, score 0.8137]</li>
+<li>Global surname frequency can cancel a useful cabin signal because LightGBM spends splits on name counts that span unrelated groups (corr with GroupSize ~0.35). [n005, score 0.8097]</li>
+<li>CabinOccupancy ≠ GroupSize on many rows (groups split across cabins / missing Cabin), so room-sharing is a distinct co-travel cue from booking-group size. [n005, score 0.8097]</li>
+<li>Global surname frequency is a weak family proxy because many last names span multiple passenger groups, so the count mostly ranks common names and can raise fold variance. [n006, score 0.8166]</li>
+<li>CabinOccupancy is near-redundant with GroupSize (high correlation; occupancy never exceeds group size), so LightGBM gains little from the extra integer once GroupSize is present. [n006, score 0.8166]</li>
+<li>Sharing a last name inside the same group is a clearer family signal than global LastNameSize and was not tested here. [n006, score 0.8166]</li>
+<li>Within-group surname counts add little once GroupSize exists: FamilyInGroup equals GroupSize on most rows (worker: 84.9%, corr 0.830), so trees mostly relearn group size. [n007, score 0.8148]</li>
+<li>A small worker quick lift vs n006 can come from dropping LastNameSize/CabinOccupancy, not from FamilyInGroup itself (worker ablation without it: quick 0.80732 &gt; 0.80603). [n007, score 0.8148]</li>
+<li>Spend composition shares can beat raw amenity magnitudes as signals: luxury share corr with Transported was −0.446 vs −0.275 for raw Spa+VRDeck, and LightGBM used both new shares (ranks 6 and 8). [n008, score 0.8189]</li>
+<li>Combining a small domain fill with composition features can stabilize folds even when the fill alone is weak: cryo-fill-only quick mixed folds/higher std, shares-only had two folds down, both together lifted all five. [n008, score 0.8189]</li>
+<li>Spend-mix shares can rank high in LightGBM splits yet still fail to raise accuracy when five log1p amenity columns already encode the same structure (collinearity). [n009, score 0.8108]</li>
+<li>After spend&gt;0→CryoSleep=False, remaining zero-spend CryoSleep NA looks cryo-like on average but overlaps many awake non-spenders (esp. children), so a blanket True fill stays near noise. [n009, score 0.8108]</li>
+<li>Quick-set gains from cabin side and within-group sharing (~+0.008 worker quick) can fail to transfer to official validation when fold variance also rises (worker quick std 0.00745→0.00909), so treat share flags as provisional until validation confirms. [n010, score 0.8079]</li>
+<li>For depth-3 HGB, cabin side appears to carry most of the quick lift; GroupSize/IsAlone add little once Side is present (worker ablations). [n010, score 0.8079]</li>
+<li>Within-group sharing flags without target encoding still risk acting as noise on held-out validation, similar to prior group-fill/surname dead ends. [n010, score 0.8079]</li>
+<li>Luxury vs essential spend is a real axis (LuxurySpend dominates tree splits), but depth-3 HGB already recovered most of it from the five raw logs, so accuracy barely moves. [n011, score 0.8068]</li>
+<li>IsChild is a true domain fact (Age&lt;13 never spend) but is redundant for shallow HGB once Age and ZeroSpend exist—ablations matched sums-only fold-for-fold. [n011, score 0.8068]</li>
+<li>Linear models harvest the composition (+0.017 worker LR) because they cannot recombine five logs; HGB still wins overall, so shipping LR for this alone is not worth it. [n011, score 0.8068]</li>
+<li>Integer GroupId is largely redundant with CabinNum (worker corr 0.681); after removal, LightGBM shifts splits onto CabinNum and other existing numerics, so accuracy stays flat. [n012, score 0.8154]</li>
+<li>Consecutive gggg groups do not share Deck/Side above chance (worker), so sequential GroupId is not a cabin-block proxy worth keeping as a numeric split feature. [n012, score 0.8154]</li>
+<li>Unique group-mate fill plus A/B/C/T/G→planet cuts location NA a lot (worker: HomePlanet 152→49, Side 164→80) but does not reliably raise LightGBM accuracy once GroupSize/CabinOccupancy exist, because ~55% of rows are singletons and NA itself is already a usable split. [n014, score 0.8148]</li>
+<li>Recomputing CabinOccupancy after filling Cabin changes many rows (worker: 226) and was the weakest occupancy timing on quick folds—reconstructed roommates are a noisier sharing signal than raw missing-cabin occupancy=1. [n014, score 0.8148]</li>
+<li>Leftover F-deck HomePlanet NA is Earth/Mars-separable by spend mix (Mars luxury ~0.15 vs Earth ~0.40; zeros mostly Mars), and filling only those 33 train rows moved official validation +0.00749 despite near-noise quick delta—small targeted location fills can still help holdout. [n013, score 0.8183]</li>
+<li>Spend-mix planet guesses largely duplicate amenity axes LightGBM already sees, so the fill’s ceiling is tiny (33/6954 rows) and can leak Transported signal via HomePlanet. [n013, score 0.8183]</li>
+<li>Unique last-name→planet among known F has perfect group-LOO planet accuracy but still spans unrelated groups, so it is a bad imputation feature even when planet labels look pure. [n013, score 0.8183]</li>
+</ul>
+<h2>Dead ends</h2>
+<ul>
+<li>LogisticRegression on cryo-imputed + one-hot features: worker quick 0.76910 vs 0.76335; C tuning did not help. [n002]</li>
+<li>Raw vs log1p spends under HGB both scored worker quick 0.79655. [n002]</li>
+<li>Depth-4 HGB reached worker quick 0.80061 but raised fold std (0.010 vs 0.007) and was not shipped. [n002]</li>
+<li>LOO GroupTransportedMean / GroupOtherTransportedCount as tree features: worker local ablation 0.80073 (on) vs 0.80163 (off); no reliable gain because predict values are constant. [n003]</li>
+<li>Fixed group-proba blend strength 0.30 or 0.50: worker |delta| ≤ 0.002 vs no blend on the same folds. [n003]</li>
+<li>Group-consistent HomePlanet/Cabin/Destination fill + deck→planet map: official 0.81369 vs parent 0.8177 (Δ−0.00401 within no_change band); does not beat parent on validation. [n004]</li>
+<li>Hard-mapping deck F to Earth was correctly avoided; remaining HomePlanet NA are mostly F (Earth vs Mars), so majority guess is not an almost-hard rule. [n004]</li>
+<li>Frame-wide SurnameFreq with CabinOccupancy: worker quick both 0.80374 ≈ parent quick 0.80331; surname alone mixed folds—do not retry global surname counts. [n005]</li>
+<li>CabinOccupancy alone lifted worker quick (+0.00487) but official validation 0.80966 did not beat parent 0.8177. [n005]</li>
+<li>LastNameSize+CabinOccupancy together: worker quick 0.80417 vs parent 0.80732 (three folds down); official validation flat vs parent. [n006]</li>
+<li>CabinOccupancy alone: worker quick 0.80460 with all five folds down vs parent. [n006]</li>
+<li>LastNameSize alone: worker quick 0.80534 with fold-0 −0.01278 and higher fold std (0.01351 vs parent 0.00812). [n006]</li>
+<li>Integer FamilyInGroup on LightGBM: official 0.81484 vs parent 0.8166 (|Δ|&lt;0.01085); worker&#39;s quick also below n004-like ablation (0.80603 vs 0.80732). [n007]</li>
+<li>Cryo remaining-NA→True alone: worker quick 0.80562 vs parent 0.80417 (+0.00145) with mixed folds and std 0.01274—extra cryo rules add little once spend features exist. [n008]</li>
+<li>Adding RoomService share is redundant: on spenders it equals 1−LuxuryShare−FoodShopShare (residual ~2e-16). [n008]</li>
+<li>Cryo zero-spend True fill + continuous Luxury/FoodShopping shares: official 0.81081 vs parent 0.8137; worker quick 0.80718 vs 0.80732. [n009]</li>
+<li>Continuous LuxuryShare+FoodShoppingShare alone: worker same-fold 0.80503 vs parent-like 0.80732 (Δ −0.00229). [n009]</li>
+<li>Full GroupSize+Side+SharesLastName+Shared{HomePlanet,Destination,Deck,CryoSleep} set: official validation 0.80794 vs parent 0.8125 (no meaningful improvement). [n010]</li>
+<li>Worker side-only quick 0.80304 missed their 0.007 bar vs parent quick 0.79655, so shipping side alone was not justified even on quick. [n010]</li>
+<li>Keeping five raw amenity logs plus the two sums (sums+raw): worker quick 0.79918 with higher fold std; collinear and not better than sums-only. [n011]</li>
+<li>Adding IsChild or AgeBin on top of Age/ZeroSpend under depth-3 HGB: identical folds to the matching spend config. [n011]</li>
+<li>Dropping TotalSpend once Luxury+Essential exist: worker quick 0.79859, slightly worse than keeping it. [n011]</li>
+<li>Ablating GroupId alone does not improve the official score beyond noise (0.81541 vs parent 0.8108, |Δ| 0.00461 &lt; 0.009201); worker quick also flat (+0.00043). [n012]</li>
+<li>Shipped stack (unique HomePlanet/Cabin/Destination fill + deck→planet + occupancy-after-fill): worker quick 0.80460 vs parent 0.80818 (4/5 down); official 0.81484 stays within |Δ|&lt;0.008682 of parent 0.8097—no meaningful gain to retry. [n014]</li>
+<li>Fill with occupancy counted on raw Cabin still lost on quick (worker 0.80530); skipping Destination fill (0.80617) or dropping occupancy under fill (0.80732) also stayed below the occupancy-only parent. [n014]</li>
+<li>Unique F-deck last-name→planet fill: worker same-fold quick 0.80475 vs parent quick 0.80718 (Δ −0.00243). [n013]</li>
+<li>Last-name map plus spend-mix LR: official quick 0.80660 vs parent quick 0.80718 (Δ −0.00058); last name was the drag. [n013]</li>
+</ul>
+</article><footer><div class="friend-label">友情链接</div><div class="friend-links"><a href="https://cats.pocketplay.win/" target="_blank" rel="noopener noreferrer">五只小猫一场戏</a> <a href="https://pocketplay.win/play/sheepdog-meadow/" target="_blank" rel="noopener noreferrer">无能的小狗</a> <a href="https://pocketplay.win/play/lily-hop/" target="_blank" rel="noopener noreferrer">大蛤蟆</a> <a href="https://pocketplay.win/" target="_blank" rel="noopener noreferrer">PocketPlay</a></div></footer></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>最初发表于 PocketPlay 博客，现托管在 GitHub Pages。</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

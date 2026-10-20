@@ -1,5 +1,6 @@
 node_modules/
 experiments/
+!/site/rsi/experiments/
 __pycache__/
 *.pyc
 .venv/
