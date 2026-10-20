@@ -52,8 +52,8 @@
   const root = byId.root;
   const bestPath = ancestry(best?.id, byId);
   const $ = id => document.getElementById(id);
-  const status = node => ['running', 'evaluating', 'analyzing', 'incomplete', 'planned', 'failed', 'abandoned'].includes(node.status) ? node.status : (node.verdict || node.status);
-  const statusClass = node => status(node) === 'analyzing' ? 'evaluating' : ['running', 'evaluating', 'incomplete', 'planned', 'failed', 'abandoned', 'improved', 'worse', 'no_change', 'baseline', 'done'].includes(status(node)) ? status(node) : 'done';
+  const status = node => ['running', 'evaluating', 'analyzing', 'waiting', 'incomplete', 'planned', 'failed', 'abandoned'].includes(node.status) ? node.status : (node.verdict || node.status);
+  const statusClass = node => ['analyzing', 'waiting'].includes(status(node)) ? 'evaluating' : ['running', 'evaluating', 'incomplete', 'planned', 'failed', 'abandoned', 'improved', 'worse', 'no_change', 'baseline', 'done'].includes(status(node)) ? status(node) : 'done';
   const color = node => ({running: 'var(--run)', evaluating: 'var(--eval)', incomplete: 'var(--warn)', planned: 'var(--plan)', failed: 'var(--bad)', abandoned: 'var(--muted)', improved: 'var(--ok)', worse: 'var(--warn)', baseline: 'var(--muted)'})[statusClass(node)] || 'var(--plan)';
   const badge = node => `<span class="tag ${statusClass(node)}">${escape(status(node) === 'incomplete' ? 'notes pending' : status(node).replaceAll('_', ' '))}</span>`;
   let selectedId = best?.id || D.nodes[0]?.id;
@@ -80,7 +80,7 @@
     box.hidden = false;
   }
   const gain = scored(root || {}) && best ? (best.score - root.score) * (D.higher_is_better ? 1 : -1) : null;
-  const running = D.nodes.filter(n => ['running', 'evaluating', 'analyzing'].includes(n.status)).length;
+  const running = D.nodes.filter(n => ['running', 'evaluating', 'analyzing', 'waiting'].includes(n.status)).length;
   const done = D.nodes.filter(n => n.id !== 'root' && n.status === 'done').length;
   const failed = D.nodes.filter(n => n.status === 'failed').length;
   const incomplete = D.nodes.filter(n => n.status === 'incomplete').length;

@@ -159,7 +159,13 @@ protocols/<protocol>/
 补齐分析、审计和交接。该命令核对原代码、检查点、预测和评分身份，只调用分析 agent，不训练、
 不重新评分、不增加搜索节点。原故障记录保留在节点的 `closeout.original.json` 和日志中。
 
-节点内的 quick 开发迭代仍由实现会话负责；长时间正式实验通过任务包的 job 配置交给队列。直接在模型 shell 工具中启动并等待一个任意长命令，不会自动变成受监控的正式任务。
+等待不占线程。正式评估提交到队列后节点进入 `waiting`（执行记录的 `execution.state = "waiting"`），worker 线程立即释放；控制器每轮扫描等待中节点的 monitor 记录（`task_wake` 事件），任务结束就给它一个线程去收结果、分析、审计、发布。同时最多允许 `search.max_waiting` 个结果待定时继续派发新节点（默认 1：一个在等、一个在实现；0 恢复严格串行）。研究 lead 的摘要里有 `PENDING RESULTS` 一段列出待定节点，决策时不得重复它们、也不能指望它们。等待中的节点算未完成工作：预算停止后仍收完待定结果再确认；中断留给下一次 `rsi run`，重启时 `recover` 按执行记录把它接回同一个队列任务（同样的代码、命令和协议），不会重复提交。失败的评估重试是新的实现尝试，不再接回失败的任务。
+
+节点内的 quick 开发迭代仍由实现会话负责；长命令通过 `rsi job submit --node-dir <nodes/id> [--gpus N] [--timeout S] -- <命令>` 交给同一个队列：记录写在 `nodes/<id>/jobs/<job>.json`，worker 写完 PROGRESS.md、commit 后结束会话；节点进入 `waiting`（`worker_job`），job 结束后框架用保存的 session_id 恢复同一个会话（`worker_resume`，时限 `runner.resume_timeout_s`，不低于 `runner.resume_min_s`），worker 读取结果、完成实现并写交付文件，再进入正式评估。每个节点最多 `runner.max_job_rounds` 轮；提示词告诉 worker 超过约 `runner.long_command_s` 的命令必须这样提交。直接在模型 shell 工具中启动并等待一个任意长命令，仍然不会成为受监控的任务。
+
+## 调度优先级与阶段
+
+可展开的父节点按优先级排序（`scheduler.priorities`，旧调度模式与研究模式共用）：利用项是节点分数或子树最优分数在候选中的归一化位置；探索项是 `explore_c / sqrt(1 + 已探索后代数)`；信息项是有未用的、带 research_question / prediction / falsifier 的 ablate 或 debug 提案；新证据项是节点（或其子节点）上次完成之后又完成的节点比例；子节点全部失败的父节点扣分。深度轮权重偏利用，广度轮偏探索：`search.phase_k > 0` 时每 k 个已派发节点交替一次；否则自适应，连续 `search.breadth_after`（默认 max(2, patience // 2)）个结果没有新 best 就进广度，出新 best 回深度。研究模式把排名、轮次和每个节点的 `rank` 写进摘要（`PHASE` 一行），lead 可以偏离，选到前 `search.priority_top_m` 名之外时 `decision.json` 记 warning，`node.worker.research.parent_rank` 保留它的名次；旧模式直接按优先级选父节点，分数相同时退化为广度优先。`rsi status` 打印当前轮次和前五个候选父节点的分解。
 
 ## 启用与检查
 

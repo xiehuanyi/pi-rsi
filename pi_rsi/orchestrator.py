@@ -252,7 +252,7 @@ class Orchestrator:
     def recover(self) -> None:
         canonical = self.tree.hypotheses()
         candidates = [n for n in canonical if n.measurement.get("state") != "stale" and (
-                      n.status in ("running", "evaluating", "analyzing", "incomplete")
+                      n.status in ("running", "evaluating", "analyzing", "incomplete", "waiting")
                       or (n.status == "failed" and n.measurement_valid and n.diagnosis.get("phase") != "integrity"))]
         for n in candidates:
             self.log("recover_stale", node=n.id, status=n.status)
@@ -293,7 +293,13 @@ class Orchestrator:
                 self.log("postprocess_resume", node=n.id, phase=postprocess.get("phase", "analysis"), new_experiments=0)
                 continue
             execution = self.executions.read(n)["execution"]
-            if (execution.get("phase") == "evaluation" or n.status in ("evaluating", "analyzing")) and wt.exists():
+            waiting = (n.worker.get("waiting") or {}).get("kind")
+            if waiting == "worker_job" and n.worker.get("resume_worker") and wt.exists():
+                # Its session ended on purpose after `rsi job submit`; the job keeps running in the queue.
+                self.tree.update(n, status="waiting")
+                self.log("monitor_resume", node=n.id, phase="worker_job")
+                continue
+            if (execution.get("phase") == "evaluation" or n.status in ("evaluating", "analyzing", "waiting")) and wt.exists():
                 if gitops.head(wt) == n.commit and not gitops.git(["status", "--porcelain"], cwd=wt):
                     self.tree.update(n, status="planned", worker={**n.worker, "resume_evaluation": True})
                     self.log("monitor_resume", node=n.id, phase="evaluate/analyze")
@@ -336,6 +342,34 @@ class Orchestrator:
             # A failed synthesis cannot invalidate completed experiments or publish partial knowledge.
             self.log("memory_failed", error=str(e))
 
+    # wake queue ------------------------------------------------------------------
+    def node_pending(self, node: Node) -> bool:
+        """Is the task a waiting node waits for still queued or running? Polling only; no model is called."""
+        from .worker import worker_jobs_pending, eval_pending_for
+        if (node.worker.get("waiting") or {}).get("kind") == "worker_job":
+            return worker_jobs_pending(self.cfg.nodes_dir / node.id)
+        return eval_pending_for(self, node)
+
+    def wake_waiting(self, wakes: dict, pool) -> int:
+        """The wake queue: a waiting node whose task ended gets a thread to collect the result, analyse and
+        finish (or to resume its worker session after a submitted job). Returns how many were woken."""
+        woken = 0
+        for n in self.scheduler.waiting():
+            if n.id in wakes or self.stop_flag.is_set():
+                continue
+            try:
+                pending = self.node_pending(n)
+            except Exception as e:  # let run_node surface the failure on this node instead of polling forever
+                self.log("wake_check_failed", node=n.id, error=str(e))
+                pending = False
+            if pending:
+                continue
+            self.log("task_wake", node=n.id, kind=(n.worker.get("waiting") or {}).get("kind", "evaluation"),
+                     waited_s=_waited_seconds(n))
+            wakes[n.id] = pool.submit(self._safe_run_node, n)
+            woken += 1
+        return woken
+
     def _heartbeat_loop(self) -> None:
         while not self.stop_flag.is_set() and getattr(self, "_status", "running") != "finished":
             try:
@@ -368,17 +402,21 @@ class Orchestrator:
         self.check_protocol()
         self.recover()
         s = cfg.search
-        futures: dict[str, Future] = {}
+        futures: dict[str, Future] = {}   # implementations holding a worker slot
+        wakes: dict[str, Future] = {}     # woken waiting nodes: collecting a result or resuming after a job
         stop_reason: str | None = None
         parallel = 1 if self.research.enabled else max(1, s.max_parallel)
-        with ThreadPoolExecutor(max_workers=parallel, thread_name_prefix="node") as pool:
+        # Waiting nodes hold no slot; when their task ends they need a thread of their own.
+        workers = parallel + max(1, getattr(s, "max_waiting", 1)) + 1
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="node") as pool:
             # relaunch planned nodes left over from a previous run
             for n in self.tree.by_status("planned"):
                 futures[n.id] = pool.submit(self._safe_run_node, n)
             while True:
-                for nid, f in list(futures.items()):
-                    if f.done():
-                        futures.pop(nid)
+                for table in (futures, wakes):
+                    for nid, f in list(table.items()):
+                        if f.done():
+                            table.pop(nid)
                 self.research_checkpoint(force=self.research.enabled or self.scheduler.consecutive_without_best() >= s.patience)
                 try:
                     self.check_protocol()  # an evaluator edited mid-run (e.g. by ops) must not mix scores
@@ -389,9 +427,12 @@ class Orchestrator:
                 if stop_reason is None:
                     stop_reason = self.scheduler.stop_reason()
                     if stop_reason:
-                        self.log("stop_condition", reason=stop_reason, in_flight=len(futures))
-                if stop_reason is None and not futures:
+                        self.log("stop_condition", reason=stop_reason, in_flight=len(futures),
+                                 waiting=len(self.scheduler.waiting()))
+                if stop_reason is None and not futures and not wakes:
                     self.maybe_run_ops()
+                # Results that are already pending are collected even after a budget stop: they were paid for.
+                self.wake_waiting(wakes, pool)
                 if stop_reason is None:
                     launched = 0
                     while len(futures) < parallel and self.scheduler.can_schedule():
@@ -400,11 +441,12 @@ class Orchestrator:
                             break
                         futures[node.id] = pool.submit(self._safe_run_node, node)
                         launched += 1
-                    if not futures and launched == 0:
+                    if not futures and not wakes and launched == 0 and not self.scheduler.waiting():
                         stop_reason = ("interrupted" if self.stop_flag.is_set() else self.scheduler.stop_reason()) or (
                             "exhausted" if self.scheduler.can_launch() else "max_nodes")
                         self.log("stop_condition", reason=stop_reason)
-                if stop_reason and not futures:
+                # An interrupt leaves waiting nodes to the next `rsi run`; a budget stop still collects them.
+                if stop_reason and not futures and not wakes and (self.stop_flag.is_set() or not self.scheduler.waiting()):
                     break
                 self.write_state()
                 time.sleep(3.0)
@@ -549,6 +591,15 @@ class Orchestrator:
                 subprocess.run(cmd, shell=True, cwd=str(Path(__file__).resolve().parents[1]), timeout=1800)
             except Exception as e:
                 self.log("hook_failed", error=str(e))
+
+
+def _waited_seconds(node: Node) -> float | None:
+    since = (node.worker.get("waiting") or {}).get("since")
+    try:
+        import datetime as _dt
+        return round(now_ts() - _dt.datetime.fromisoformat(since).timestamp(), 1) if since else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _paired_noise(m1: dict, m2: dict) -> float | None:

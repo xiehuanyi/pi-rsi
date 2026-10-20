@@ -81,6 +81,24 @@ if mode == "json":
         end({})
     sys.exit(0)
 
+if mode == "resume" and prompt.startswith("Your submitted job"):  # woken after `rsi job submit`: finish the node
+    nd = Path(re.search(r"`([^`]+)/PROGRESS.md`", prompt).group(1))
+    result = (nd / "job_result.txt").read_text().strip() if (nd / "job_result.txt").exists() else "missing"
+    with open(nd / "PROGRESS.md", "a") as f:
+        f.write(f"- resumed after the submitted job; result {result}\n")
+    Path("agent.py").write_text(Path("agent.py").read_text() + f"\n# job result {result}\n")
+    subprocess.run(["git", "commit", "-qam", "fake: after the submitted job"], check=False)
+    if "IMPLEMENTATION.md" in prompt:
+        (nd / "IMPLEMENTATION.md").write_text(f"# Implementation {nd.name}: fake\n## What I built\nused job result {result}\n"
+                                           "## How to run\nfake\n## Development results\nquick: 0\n")
+        (nd / "DELIVERY.json").write_text(json.dumps({"component": "on", "reason": "fake"}))
+    else:
+        (nd / "HANDOFF.md").write_text(f"# Handoff {nd.name}: fake\n## Hypothesis\nfake\n## What I did\nused job\n## Result\nquick: 0\n")
+        (nd / "proposals.json").write_text(json.dumps([{"title": "fake child", "hypothesis": "fake child hyp", "type": "idea",
+                                                        "expected_gain": "none", "risk": "none"}]))
+    end()
+    sys.exit(0)
+
 if mode == "resume":  # analysis session (job mode) or handoff rescue: append the official result to the handoff
     m = re.search(r"official score \([^)]*\): ([^\n]+)", prompt)
     nd = re.search(r"`([^`]+)/HANDOFF.md`", prompt)
@@ -129,6 +147,16 @@ node_dir = Path(re.search(r"Node notes directory.*?`([^`]+)`", prompt).group(1))
 node_id = re.search(r"- Node: `([^`]+)`", prompt).group(1)
 retry = "this is a retry" in prompt.lower()
 node_dir.mkdir(parents=True, exist_ok=True)
+if os.environ.get("FAKE_SUBMIT_JOB") and not (node_dir / "jobs").exists():
+    # A long command goes to the queue through the harness CLI; the session ends and is resumed later.
+    rsi = os.environ.get("FAKE_RSI_BIN") or str(Path(__file__).resolve().parents[1] / "rsi")
+    out = subprocess.run([rsi, "job", "submit", "--node-dir", str(node_dir), "--timeout", "120", "--", "bash", "-c",
+                          f"sleep {os.environ['FAKE_SUBMIT_JOB']} && echo 42 > {node_dir}/job_result.txt"],
+                         capture_output=True, text=True, check=True)
+    with open(node_dir / "PROGRESS.md", "a") as f:
+        f.write(f"# Progress {node_id}\n- submitted job {out.stdout.strip()}; ending the session until it finishes\n")
+    end()
+    sys.exit(0)
 if Path("config.toml").exists() and Path("src/trainer.py").exists():   # toy long-job task: tweak the config, always succeed
     import hashlib
     h = int(hashlib.md5(node_id.encode()).hexdigest(), 16)

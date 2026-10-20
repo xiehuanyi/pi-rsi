@@ -17,6 +17,11 @@ class RunnerCfg:
     node_timeout_s: int = 1800    # wall-clock per worker session
     idle_timeout_s: int = 420     # no output for this long -> kill
     extra_args: list[str] = field(default_factory=list)
+    # Long commands go through `rsi job submit`: the session ends and is resumed when the job finishes.
+    long_command_s: int = 600     # what the worker is told counts as a long command
+    max_job_rounds: int = 3       # submit-and-resume rounds per node
+    resume_timeout_s: int = 900   # wall-clock of one resumed session (capped by the hypothesis budget ...)
+    resume_min_s: int = 300       # ... but never below this, so a finished job can always be folded in
 
 
 @dataclass
@@ -112,6 +117,14 @@ class SearchCfg:
     max_wallclock_s: int | None = None
     max_gpu_hours: float | None = None   # job mode: sum of job duration × gpus for this experiment
     root_eval: bool = True       # evaluate the starter to get the root score
+    # Parent choice = exploit (score / subtree best) + explore (few explored descendants, new evidence
+    # since the node was last touched) + information (an unused ablate/debug proposal with a falsifier).
+    explore_c: float = 1.0       # scale of the exploration term (0 = pure best-first)
+    phase_k: int = 0             # alternate depth / breadth weights every k launched nodes (0 = adaptive)
+    phase_adaptive: bool = True  # with phase_k = 0: breadth after `breadth_after` nodes without a new best
+    breadth_after: int = 0       # 0 = max(2, patience // 2)
+    priority_top_m: int = 3      # research mode: a chosen parent outside the top M is a warning, not a veto
+    max_waiting: int = 1         # results that may stay pending (queued/running) while new nodes are dispatched
 
 
 @dataclass
@@ -124,10 +137,17 @@ class MemoryCfg:
     context_chars: int = 12000
     research_every: int = 3      # reserve every Nth expansion for a discriminating experiment; 0 disables
     patience_grace: int = 2      # bounded extra nodes at a score plateau, never a budget reset
+    # Layered recall: L0 agenda, L1 every direction (topic page), L2 claims by relevance, L3 raw by ID.
+    agenda_chars: int = 3000     # L0 budget inside context_chars
+    topic_chars: int = 4000      # L1 budget inside context_chars; every direction stays visible
+    path_summary: bool = True    # PATH.md: the ancestor chain compressed for a node's children
+    path_chars: int = 2500
 
     def __post_init__(self):
         if self.reflect_every < 1 or self.batch_size < 1 or self.context_chars < 2000:
             raise ValueError("memory requires reflect_every/batch_size >= 1 and context_chars >= 2000")
+        if min(self.agenda_chars, self.topic_chars, self.path_chars) < 500:
+            raise ValueError("memory agenda_chars/topic_chars/path_chars must be at least 500")
         if self.research_every < 0 or self.patience_grace < 0:
             raise ValueError("memory research_every/patience_grace must be nonnegative")
 

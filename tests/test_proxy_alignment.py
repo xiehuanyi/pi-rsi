@@ -310,7 +310,9 @@ class SkippedEvaluationTests(unittest.TestCase):
         self.orch.utility.diagnose = Mock(return_value={"retry": False, "cause": "evaluator stub", "advice": ""})
         from unittest.mock import patch
         from pi_rsi.worker import run_node
-        with patch("pi_rsi.worker.run_eval", side_effect=RuntimeError("evaluator reached")):
+        # The official evaluation is submitted first (begin_eval) and collected afterwards (run_eval).
+        with patch("pi_rsi.worker.begin_eval", side_effect=RuntimeError("evaluator reached")), \
+                patch("pi_rsi.worker.run_eval", side_effect=RuntimeError("evaluator reached")):
             run_node(self.orch, self.node)
         self.assertIn("evaluator reached", self.node.failure)
 

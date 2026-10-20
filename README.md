@@ -35,15 +35,24 @@ tree scheduler; existing experiments opt in with `rsi research enable <experimen
    full review of the whole tree (with reference reading) runs on the first decision, every `research.review_every`
    experiments, on plateaus, on new human direction and before any stop, and writes `DECISION.md`. The lead never
    writes JSON: a small model (GPT-6 Luna) structures the text; the harness checks what decides execution (parent
-   node, budget, a quote of the decision) and only warns about audit fields.
+   node, budget, a quote of the decision) and only warns about audit fields. The eligible parents come ranked by a
+   **priority** (exploit: score or subtree best; explore: few explored descendants, new evidence since the node was
+   last touched; information: an unused ablation with a falsifier), under a **depth or breadth round** (fixed
+   alternation every `search.phase_k` nodes, or adaptive: breadth after a stall). The lead may build on any
+   eligible parent; a choice outside the top `search.priority_top_m` is recorded as a warning, never vetoed.
 3. **Implement.** A worker implements and tunes that one approach in its own worktree within the budget, and
    writes `IMPLEMENTATION.md` and `DELIVERY.json` (what the delivered commit runs; switched-off components are
    measured switched on).
-4. **Measure.** The official evaluation runs through a job queue with the frozen evaluator. The harness verdict
+4. **Measure.** The official evaluation runs through a job queue with the frozen evaluator. The node is **submitted
+   and released**: it waits in state `waiting` without holding a worker thread, the controller keeps dispatching
+   (up to `search.max_waiting` results may be pending; the lead's digest lists them), and the **wake queue** resumes
+   the node when its task ends. A worker that needs a long command hands it to the same queue with
+   `rsi job submit` and ends its session; the harness resumes that session when the job ends. The harness verdict
    (`eval/comparison.json`) counts a gain only above the larger of the measured noise band and the practical
    threshold; it is the single judgement every other file cites.
 5. **Analyze.** The lead writes `HANDOFF.md` (what the result means) and `NEXT.md` (what to do next). GPT-6 Luna
-   maintains the three-layer research Wiki (raw evidence, knowledge pages, index); `PROXY.md` tracks how
+   maintains the layered research Wiki (L0 agenda, L1 direction pages, L2 claims, L3 raw evidence) and compresses
+   the node's ancestor chain into `PATH.md`, the working memory its children receive; `PROXY.md` tracks how
    development, forecast and official deltas agree, and `rsi observe` feeds results on the real target back in.
 6. **Course correction.** After K experiments without real progress (default `search.patience`), a fresh reviewer
    agent questions data, model family, evaluation setup and search process (`course/kNNN/COURSE.md`); the next
@@ -173,7 +182,13 @@ that assigns GPUs (`CUDA_VISIBLE_DEVICES`), enforces `job_timeout_s`, kills stal
 `metrics.json` (final score); `job_resumable = true` re-submits a failed job once with `--resume`. Each queue has
 exactly one daemon (`jobd.lock`); jobs are claimed and launched atomically, and a restarted daemon adopts live jobs
 under the same limits (PIDs are identity-checked before any signal). The attempt number lives in the task monitor, so
-a restarted controller waits on the running attempt instead of resubmitting it. Levels replace seed sets
+a restarted controller waits on the running attempt instead of resubmitting it. Waiting never holds a thread: a
+node whose evaluation is queued or running is `waiting`, the controller polls the task monitor each tick and wakes
+the node when the task ends (`task_wake`), and new nodes keep being dispatched while at most `search.max_waiting`
+results are pending (0 restores the strictly sequential loop). Workers hand their own long commands to the queue:
+`rsi job submit --node-dir <nodes/id> [--gpus N] -- <command>` registers the job, the worker ends its session,
+and the harness resumes that session (`worker_resume`) once the job ends, at most `runner.max_job_rounds` times
+per node. Levels replace seed sets
 (`job_budgets = { smoke = ..., proxy = ..., full = ... }`): workers iterate on `smoke`, the official score is `proxy`,
 and the top `final_top_k` nodes get a `full` run at the end. `search.max_gpu_hours` caps the run.
 `tasks/toy-longjob` exercises all of this on CPU in a few minutes (`tests/test_jobs.sh`).
@@ -201,8 +216,12 @@ writes `HANDOFF.md` and `proposals.json`, and the auditor appends to `INSIGHTS.m
 ## Research memory
 
 Runs maintain a versioned research Wiki per task and evaluation protocol: immutable experimental evidence, scoped
-observations/hypotheses/experience with supporting and opposing evidence, and an agenda of motivation, method and
-open questions (plans stay in the research lead's decisions). Workers receive a saved memory snapshot. Use
+observations/hypotheses/experience with supporting and opposing evidence, **direction pages** (one per research
+direction: what was tried, the best result, why it stalled, which claims and nodes belong to it), and an agenda of
+motivation, method and open questions (plans stay in the research lead's decisions). Recall is layered and
+bounded: the agenda (L0) and every direction summary (L1) always fit; claims (L2) are chosen by the query and its
+matching directions; raw packets (L3) are read by ID. Each analysed node also gets `PATH.md`, its ancestor chain
+compressed by the maintainer (mechanically when the model call fails). Workers receive a saved memory snapshot. Use
 `--memory-dir` (or `memory.path`) to isolate a study's Wiki from earlier ones, and `--no-memory` for a control run.
 Existing runs opt in with `rsi memory enable <exp>`; import paper excerpts/notes with
 `rsi memory ingest <exp> --source <file>`. See [configuration, evidence boundaries, and validation](docs/RESEARCH_MEMORY.md).
@@ -221,7 +240,11 @@ Existing runs opt in with `rsi memory enable <exp>`; import paper excerpts/notes
 - Failed nodes (crash, timeout without usable work, evaluator failure, edits under `eval/`) are diagnosed; a retry with
   the diagnoser's advice continues the same hypothesis from its last commit (`max_retries`).
 - Sessions killed at the budget get a **handoff rescue**: the same session is resumed once to write its notes only.
-- Legacy scheduler: best-first parent choice with `width_root`/`width`/`depth` caps and a `patience` stop.
+- A waiting node (its task queued or running) is unfinished work: a budget stop still collects pending results
+  before confirmation, an interrupt leaves them to the next `rsi run`, which re-attaches to the same task.
+- Legacy scheduler: the same priority ranking (exploit + explore + information, depth/breadth rounds) with
+  `width_root`/`width`/`depth` caps and a `patience` stop; equal scores fall back to breadth-first.
+  `rsi status` prints the current round and the top candidate parents with their priority terms.
 
 ## Runners and models
 

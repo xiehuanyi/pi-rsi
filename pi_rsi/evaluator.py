@@ -33,6 +33,11 @@ def eval_command(cfg: ExperimentCfg, worktree: Path, seedset: str, out: Path) ->
     return shlex.split(cmd)
 
 
+def queued_eval(cfg: ExperimentCfg) -> bool:
+    """Official evaluations run through the task queue, so a node can wait for one without holding a thread."""
+    return bool(cfg.task.job_enabled or cfg.research.enabled)
+
+
 def run_eval(cfg: ExperimentCfg, worktree: Path, seedset: str, out_dir: Path, tag: str = "",
              owner: str = "", incumbent_path: Path | None = None, resume: bool = False) -> dict[str, Any]:
     """`resume=True` continues an evaluation a previous controller started (same job, same attempt);
@@ -67,42 +72,103 @@ def _early_stopped(job) -> bool:
     return job.status == "killed" and job.reason.startswith("early stop")
 
 
-def _monitored_attempts(monitor, commands, cwd, identity, *, aliases=None, resume=False, **options):
-    """Run one evaluation through its task monitor; commands[k] is attempt k (k > 0 resumes).
+def _monitored_advance(monitor, commands, cwd, identity, *, aliases=None, resume=False, **options):
+    """One step of an evaluation's attempt chain, without waiting: (job, pending).
 
-    The attempt ordinal lives in the monitor record, not in this loop: a restarted controller
-    (resume=True) waits on the same queued/running job or continues with the next attempt instead
-    of resubmitting attempt 0, which would collide with the live job or silently restart training."""
+    commands[k] is attempt k (k > 0 resumes). A queued/running/finished job of the same evaluation is
+    reused; after a terminal failure the next attempt is submitted when one is left (resume=True), or
+    attempt 0 again for a new evaluation request (resume=False, e.g. after an implementation retry).
+    The attempt ordinal lives in the monitor record, so a restarted controller never collides with
+    a live job or silently restarts training."""
     attempt, previous = monitor.last_attempt(identity, aliases)
     if previous is not None and previous.status in ("failed", "killed"):
         if not resume:
-            attempt = 0  # a new evaluation request (e.g. after an implementation retry)
+            attempt = 0
         elif _early_stopped(previous) or attempt + 1 >= len(commands):
-            return previous  # that evaluation already ended for good
+            return previous, False  # that evaluation already ended for good
         else:
             attempt += 1
-    while True:
-        job = monitor.submit(commands[attempt], cwd, identity=identity, attempt=attempt, aliases=aliases, **options)
-        attempt = monitor.attempt(attempt)  # a reused live/finished job keeps its own attempt
-        job = monitor.wait(job.id)
-        if job.status == "done" or _early_stopped(job) or attempt + 1 >= len(commands):
-            return job
-        attempt += 1
+    job = monitor.submit(commands[attempt], cwd, identity=identity, attempt=attempt, aliases=aliases, **options)
+    return job, job.status in ("queued", "running")
+
+
+def _monitored_attempts(monitor, commands, cwd, identity, *, aliases=None, resume=False, **options):
+    """Run one evaluation through its task monitor to its end (the blocking form of the chain above)."""
+    job, pending = _monitored_advance(monitor, commands, cwd, identity, aliases=aliases, resume=resume, **options)
+    while pending:
+        monitor.wait(job.id)
+        job, pending = _monitored_advance(monitor, commands, cwd, identity, aliases=aliases, resume=True, **options)
+    monitor.refresh(job)  # the terminal state is on record even when no wait was needed
+    return job
+
+
+def _eval_spec(cfg, worktree, seedset, out_dir, tag="", owner="", incumbent_path=None):
+    """Everything a queued official evaluation needs, derived from the configuration and the worktree alone,
+    so that a waiting evaluation can be re-attached by a later poll or a restarted controller."""
+    from .monitor import TaskMonitor, evaluation_identity
+    out_dir.mkdir(parents=True, exist_ok=True)
+    name = f"metrics.{seedset}{('.' + tag) if tag else ''}.json"
+    monitor = TaskMonitor(out_dir / name.replace(".json", ".monitor.json"))
+    if cfg.task.job_enabled:
+        run_dir = out_dir / f"run.{seedset}{('.' + tag) if tag else ''}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        commands = [job_command(cfg, seedset, run_dir, resume=k > 0) for k in range(2 if cfg.task.job_resumable else 1)]
+        # One identity per evaluation, independent of the attempt (the --resume flag is not identity).
+        identity = evaluation_identity(cfg, worktree, commands[0])
+        aliases = {TaskMonitor.fingerprint(evaluation_identity(cfg, worktree, c)): k
+                   for k, c in enumerate(commands) if k}
+        es = dict(cfg.task.job_early_stop or {})
+        if es:
+            es.setdefault("higher_is_better", cfg.task.higher_is_better)
+        options = dict(owner=owner, gpus=cfg.task.job_gpus, timeout_s=cfg.task.job_timeout_s,
+                       stall_s=cfg.task.job_stall_s, metrics_path=str(run_dir / "metrics.jsonl"),
+                       result_path=str(run_dir / "metrics.json"),
+                       incumbent_path=str(incumbent_path) if (incumbent_path and es and Path(incumbent_path).exists()) else "",
+                       early_stop=es if incumbent_path else {}, priority=1)
+        return {"kind": "job", "monitor": monitor, "commands": commands, "identity": identity, "aliases": aliases,
+                "cwd": worktree, "options": options, "out": out_dir / name, "run_dir": run_dir}
+    cmd = eval_command(cfg, worktree, seedset, out_dir / name)
+    options = dict(owner=owner, gpus=0, timeout_s=cfg.task.eval_timeout_s, stall_s=0,
+                   result_path=str(out_dir / name), priority=1)
+    return {"kind": "monitored", "monitor": monitor, "commands": [cmd], "identity": evaluation_identity(cfg, worktree, cmd),
+            "aliases": {}, "cwd": cfg.task_dir, "options": options, "out": out_dir / name, "run_dir": None}
+
+
+def begin_eval(cfg, worktree, seedset, out_dir, tag="", owner="", incumbent_path=None, resume=False) -> bool:
+    """Submit the official evaluation to the task queue, or re-attach to the one already submitted, and return
+    without waiting. True while it is queued or running. False once its result can be collected: run_eval(...,
+    resume=True) then returns immediately. A synchronous evaluator (no queue) is never pending."""
+    if not queued_eval(cfg):
+        return False
+    spec = _eval_spec(cfg, worktree, seedset, out_dir, tag, owner, incumbent_path)
+    try:
+        job, pending = _monitored_advance(spec["monitor"], spec["commands"], spec["cwd"], spec["identity"],
+                                          aliases=spec["aliases"], resume=resume, **spec["options"])
+    except (RuntimeError, FileNotFoundError) as e:
+        if isinstance(e, EvalError):
+            raise
+        raise EvalError(f"task monitor failed: {e}") from e
+    spec["monitor"].refresh(job)
+    if pending:
+        from . import jobs
+        jobs.ensure_daemon()  # a poll keeps the queue alive exactly as a blocking wait would
+    return pending
+
+
+def eval_pending(cfg, worktree, seedset, out_dir, tag="", owner="", incumbent_path=None) -> bool:
+    """Poll a submitted evaluation: continue its attempt chain when an attempt failed and another is allowed,
+    refresh the monitor record (state, progress) and report whether it is still queued or running."""
+    return begin_eval(cfg, worktree, seedset, out_dir, tag, owner, incumbent_path, resume=True)
 
 
 def run_monitored_eval(cfg, worktree, seedset, out_dir, tag, owner, resume=False):
     """Ordinary CPU evaluations use the same external queue/monitor as training jobs."""
-    from .monitor import TaskMonitor, evaluation_identity
-    out_dir.mkdir(parents=True, exist_ok=True)
-    name = f"metrics.{seedset}{('.' + tag) if tag else ''}.json"
-    out = out_dir / name
-    monitor = TaskMonitor(out_dir / name.replace(".json", ".monitor.json"))
-    cmd = eval_command(cfg, worktree, seedset, out)
+    spec = _eval_spec(cfg, worktree, seedset, out_dir, tag, owner)
+    monitor, out, cmd = spec["monitor"], spec["out"], spec["commands"][0]
     t0 = time.time()
     try:
-        job = _monitored_attempts(monitor, [cmd], cfg.task_dir, evaluation_identity(cfg, worktree, cmd),
-                                  resume=resume, owner=owner, gpus=0, timeout_s=cfg.task.eval_timeout_s,
-                                  stall_s=0, result_path=str(out))
+        job = _monitored_attempts(monitor, spec["commands"], spec["cwd"], spec["identity"], resume=resume,
+                                  **spec["options"])
         metrics = read_json(out)
         if job.status != "done" or not isinstance(metrics, dict) or score_of(cfg, metrics) is None:
             monitor.save(state="invalid" if job.status == "done" else job.status, wake_ready=False)
@@ -181,22 +247,10 @@ def run_job_eval(cfg: ExperimentCfg, worktree: Path, level: str, out_dir: Path, 
         except FileNotFoundError:
             pass
     if job is None:
-        commands = [job_command(cfg, level, run_dir, resume=k > 0) for k in range(2 if cfg.task.job_resumable else 1)]
-        # One identity per evaluation, independent of the attempt (the --resume flag is not identity).
-        identity = evaluation_identity(cfg, worktree, commands[0])
-        aliases = {TaskMonitor.fingerprint(evaluation_identity(cfg, worktree, c)): k
-                   for k, c in enumerate(commands) if k}
-        es = dict(cfg.task.job_early_stop or {})
-        if es:
-            es.setdefault("higher_is_better", cfg.task.higher_is_better)
+        spec = _eval_spec(cfg, worktree, level, out_dir, tag, owner, incumbent_path)
         try:
-            job = _monitored_attempts(
-                monitor, commands, worktree, identity, aliases=aliases, resume=resume,
-                owner=owner, gpus=cfg.task.job_gpus, timeout_s=cfg.task.job_timeout_s,
-                stall_s=cfg.task.job_stall_s, metrics_path=str(run_dir / "metrics.jsonl"),
-                result_path=str(run_dir / "metrics.json"),
-                incumbent_path=str(incumbent_path) if (incumbent_path and es and Path(incumbent_path).exists()) else "",
-                early_stop=es if incumbent_path else {})
+            job = _monitored_attempts(monitor, spec["commands"], worktree, spec["identity"], aliases=spec["aliases"],
+                                      resume=resume, **spec["options"])
         except RuntimeError as e:  # monitor refused (e.g. a different evaluation is still running)
             raise EvalError(f"task monitor failed: {e}") from e
         prev_file.write_text(job.id)

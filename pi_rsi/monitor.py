@@ -87,6 +87,19 @@ class TaskMonitor:
     def attempt(self, default=0):
         return int((read_json(self.path, {}) or {}).get("attempt", default))
 
+    def refresh(self, job):
+        """Record the task's current queue state without waiting or waking anything. States written after
+        validation (validated / analyzing / consumed / invalid) belong to the controller and are kept."""
+        record = read_json(self.path, {}) or {}
+        if record.get("job") != job.id:
+            return record
+        if job.status in ("done", "failed", "killed"):
+            if record.get("state") in ("validated", "analyzing", "consumed", "invalid"):
+                return record
+            return self.save(state=job.status, exit_code=job.exit_code, reason=job.reason,
+                             finished_at=job.ended_at, wake_ready=False)
+        return self.save(state=job.status, pid=job.pid, last_step=job.last_step, last_value=job.last_value)
+
     def wait(self, job_id):
         # Reuse queued/running/completed jobs after controller restarts.
         jobs.ensure_daemon()

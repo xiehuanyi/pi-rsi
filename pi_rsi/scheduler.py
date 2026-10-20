@@ -1,7 +1,11 @@
-"""Best-first scheduler with depth/width caps. Backtracking is implicit: when the best node is exhausted (all
-width slots used) or too deep, the next-best expandable node anywhere in the tree gets the slot."""
+"""Priority scheduler with depth/width caps. A parent's priority = exploit (its score or its subtree's best)
++ explore (few explored descendants, new evidence since it was last touched) + information (an unused
+ablate/debug proposal with a falsifier) - a penalty for children that all failed. Depth rounds weight exploit,
+breadth rounds weight explore; rounds alternate every `phase_k` nodes or adaptively on a stall. Backtracking is
+implicit: an exhausted or too-deep best node simply loses the slot to the next-ranked expandable node."""
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from .tree import Node, Tree
@@ -10,6 +14,13 @@ from .util import now_iso, now_ts
 # Compatible sentinel stored in Node.proposals_used when the planner yields nothing
 # further for this parent. Persisted trees already use -1 this way.
 PLANNER_EXHAUSTED = -1
+
+# Term weights per round. Every term is bounded to [0, 1] (explore is scaled by search.explore_c).
+PHASE_WEIGHTS = {
+    "depth": {"exploit": 1.0, "explore": 0.25, "info": 0.3, "novelty": 0.2, "fail": 0.3},
+    "breadth": {"exploit": 0.4, "explore": 1.0, "info": 0.5, "novelty": 0.5, "fail": 0.3},
+}
+FINISHED = ("done", "failed", "incomplete")
 
 
 class Scheduler:
@@ -79,7 +90,86 @@ class Scheduler:
         return [i for i in range(len(parent.proposals)) if i not in parent.proposals_used]
 
     def in_flight(self) -> list[Node]:
+        """Nodes holding a worker: a `waiting` node (its task is queued or running) holds none."""
         return self.tree.by_status("planned", "running", "evaluating", "analyzing")
+
+    def waiting(self) -> list[Node]:
+        return self.tree.by_status("waiting")
+
+    def waiting_allows_dispatch(self) -> bool:
+        return len(self.waiting()) <= max(0, getattr(self.cfg.search, "max_waiting", 1))
+
+    # parent priority -------------------------------------------------------------
+    def phase(self) -> str:
+        """depth: follow the best branch; breadth: spread over under-explored parents. Fixed alternation
+        every `phase_k` launched nodes, else adaptive: breadth once `breadth_after` nodes brought no new best."""
+        s = self.cfg.search
+        k = getattr(s, "phase_k", 0) or 0
+        if k > 0:
+            return "breadth" if (self.launched_count() // k) % 2 else "depth"
+        if getattr(s, "phase_adaptive", True):
+            after = getattr(s, "breadth_after", 0) or max(2, s.patience // 2)
+            if self.consecutive_without_best() >= after:
+                return "breadth"
+        return "depth"
+
+    def priorities(self, phase: str | None = None, candidates: list[Node] | None = None) -> dict[str, dict]:
+        """Priority decomposition of every candidate parent (default: every expandable node), computed in one
+        pass over the tree so a review of hundreds of parents stays cheap."""
+        phase = phase or self.phase()
+        w = PHASE_WEIGHTS[phase]
+        cands = candidates if candidates is not None else [n for n in self.tree.nodes.values() if self.expandable(n)]
+        if not cands:
+            return {}
+        children: dict[str | None, list[Node]] = {}
+        for n in self.tree.hypotheses():
+            children.setdefault(n.parent, []).append(n)
+        direction = 1 if self.tree.higher_is_better() else -1
+        stats: dict[str, tuple[float | None, int]] = {}  # id -> (best score in the subtree, explored descendants)
+
+        def visit(n: Node):
+            if n.id in stats:
+                return stats[n.id]
+            best = direction * n.score if n.measurement_valid else None
+            explored = 0
+            for c in children.get(n.id, []):
+                cb, ce = visit(c)
+                explored += ce + (1 if c.status in FINISHED else 0)
+                if cb is not None and (best is None or cb > best):
+                    best = cb
+            stats[n.id] = (best, explored)
+            return stats[n.id]
+
+        bests = [visit(c)[0] for c in cands]
+        values = [b for b in bests if b is not None]
+        lo, hi = (min(values), max(values)) if values else (0.0, 0.0)
+        finished = self.tree.finished_in_order()
+        scale = getattr(self.cfg.search, "explore_c", 1.0)
+        out = {}
+        for n, best in zip(cands, bests):
+            explored = stats[n.id][1]
+            exploit = 0.5 if best is None or hi == lo else (best - lo) / (hi - lo)
+            explore = scale / math.sqrt(1 + explored)
+            info = 1.0 if any(self.discriminating(n.proposals[i]) for i in self._unused_indices(n)) else 0.0
+            kids = children.get(n.id, [])
+            touch = max([n.finished_order or 0, *[c.finished_order or 0 for c in kids]])
+            newer = sum(1 for m in finished if (m.finished_order or 0) > touch)
+            novelty = newer / len(finished) if finished else 0.0
+            failed = sum(1 for c in kids if c.status == "failed" and not c.measurement_valid)
+            fail = failed / len(kids) if kids else 0.0
+            total = (w["exploit"] * exploit + w["explore"] * explore + w["info"] * info
+                     + w["novelty"] * novelty - w["fail"] * fail)
+            out[n.id] = {"phase": phase, "total": round(total, 4), "exploit": round(exploit, 3),
+                         "explore": round(explore, 3), "info": info, "novelty": round(novelty, 3),
+                         "fail": round(fail, 3), "explored": explored}
+        return out
+
+    def ranked(self, phase: str | None = None, candidates: list[Node] | None = None) -> list[tuple[Node, dict]]:
+        """Candidates best first: higher priority, then shallower, then id."""
+        cands = candidates if candidates is not None else [n for n in self.tree.nodes.values() if self.expandable(n)]
+        ranking = self.priorities(phase, cands)
+        order = sorted(cands, key=lambda n: (-ranking[n.id]["total"], n.depth, n.id))
+        return [(n, ranking[n.id]) for n in order]
 
     def launched_count(self) -> int:
         return len({n.hypothesis_key for n in self.tree.non_root() if n.status != "abandoned"})
@@ -100,6 +190,8 @@ class Scheduler:
                    for n in self.tree.hypotheses() if n.id != "root")
 
     def can_schedule(self) -> bool:
+        if not self.waiting_allows_dispatch():
+            return False  # enough results are pending; wait for one before starting more work
         return self.can_launch() or any(self.will_retry(n) for n in self.tree.hypotheses())
 
     def consecutive_without_best(self) -> int:
@@ -154,8 +246,8 @@ class Scheduler:
                     and n.status in ("done", "failed") and not self.will_retry(n)]
         if len(finished) >= s.max_nodes:
             return "max_nodes"
-        if self.execution_count() >= self.attempt_limit() and not self.in_flight():
-            return "max_attempts"
+        if self.execution_count() >= self.attempt_limit() and not self.in_flight() and not self.waiting():
+            return "max_attempts"  # a pending result is still an attempt in flight
         if self.runner_broken():
             return "runner_broken"
         research = getattr(self.o, "research", None)
@@ -179,7 +271,7 @@ class Scheduler:
         hypotheses = self.tree.hypotheses()
         if any(n.status == "incomplete" for n in hypotheses):
             faults.append("postprocess_failed")
-        if any(n.status in ("planned", "running", "evaluating", "analyzing") for n in hypotheses):
+        if any(n.status in ("planned", "running", "evaluating", "analyzing", "waiting") for n in hypotheses):
             faults.append("unfinished_nodes")
         if self.tree.meta.get("research_error"):
             faults.append("research_failed")
@@ -211,9 +303,7 @@ class Scheduler:
                                                for i in self._unused_indices(n))]
             if research:
                 cands = research
-        hib = self.tree.higher_is_better()
-        cands.sort(key=lambda n: ((-n.score if hib else n.score), n.depth, n.id))
-        return cands[0]
+        return self.ranked(self.phase(), cands)[0][0]
 
     def next_node(self) -> Node | None:
         """Create and persist the next planned node, or return None if nothing can be scheduled right now."""
@@ -269,11 +359,14 @@ class Scheduler:
                     i = next((j for j in unused if self.discriminating(parent.proposals[j])), i)
                 prop = parent.proposals[i]
                 self.tree.update(parent, proposals_used=parent.proposals_used + [i])
+                phase = self.phase()
+                priority = self.priorities(phase).get(parent.id) or self.priorities(phase, [parent]).get(parent.id, {})
                 node = Node(id=self.tree.new_id(), parent=parent.id, depth=parent.depth + 1, title=prop["title"],
                             hypothesis=prop["hypothesis"], kind=prop.get("type", "idea"), base_commit=parent.commit,
-                            worker={"proposal": prop})
+                            worker={"proposal": prop, "dispatch": {"phase": phase, "priority": priority}})
                 self.tree.add(node)
-                self.o.log("node_planned", node=node.id, parent=parent.id, title=node.title, kind=node.kind)
+                self.o.log("node_planned", node=node.id, parent=parent.id, title=node.title, kind=node.kind,
+                           phase=phase, priority=priority.get("total"))
                 return node
 
     def _make_retry(self, failed: Node) -> Node:
@@ -281,8 +374,10 @@ class Scheduler:
         advice += (f"\n\nThis is a retry of execution attempt {failed.attempt} of the SAME hypothesis `{failed.hypothesis_key}`. "
                    f"Read its saved notes at `{self.cfg.nodes_dir / failed.id}`. Continue from its existing code; "
                    "do not count this recovery as a new research approach.")
+        # A retry is a new implementation attempt: it never re-attaches to the failed attempt's task.
         self.tree.update(failed, status="planned", attempt=failed.attempt + 1, finished_at=None,
-                         advice=advice, worker={**failed.worker, "resume_implementation": True})
+                         advice=advice, worker={**failed.worker, "resume_implementation": True,
+                                                "resume_evaluation": False, "resume_worker": False, "waiting": None})
         self.o.log("execution_retry", node=failed.id, hypothesis=failed.hypothesis_key,
                    attempt=failed.attempt, new_hypotheses=0)
         return failed

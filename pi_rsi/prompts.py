@@ -91,6 +91,8 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
         human_block=human_block, title=node.title, hypothesis=node.hypothesis, kind=node.kind,
         expected_gain=prop.get("expected_gain", "unknown"), risk=prop.get("risk", "unknown"),
         path_block=_path_block(cfg, tree, node), parent_handoff=parent_handoff,
+        path_summary=(read_text(node_dir(cfg, parent.id) / "PATH.md", "").strip() if parent and parent.id != "root" else "")
+                     or "(none yet: the parent is the root baseline or no analysis has been compressed)",
         insights=read_text(cfg.insights_path, "(none yet)")[-4000:] if cfg.memory.enabled else read_text(cfg.insights_path, "(none yet)"),
         deadends=read_text(cfg.deadends_path, "(none yet)")[-4000:] if cfg.memory.enabled else read_text(cfg.deadends_path, "(none yet)"),
         research_memory=read_text(node_dir(cfg, node.id) / "MEMORY.md") if cfg.memory.enabled else "",
@@ -105,6 +107,7 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
         entry_files="the current `agent.py`" if (cfg.repo_dir / "agent.py").exists() else "the task's current entry-point code",
         objective_block=objective_block(cfg), proposal_rule=proposal_rule(cfg),
         notes_file="IMPLEMENTATION.md" if cfg.research.enabled else "HANDOFF.md",
+        rsi_bin=rsi_bin(), long_minutes=max(1, cfg.runner.long_command_s // 60), max_job_rounds=cfg.runner.max_job_rounds,
     )
     mode = "research" if cfg.research.enabled else "legacy"
     kw["context_block"] = render(f"worker_context_{mode}", **kw)
@@ -112,6 +115,32 @@ def worker_prompt(cfg: ExperimentCfg, tree: Tree, node: Node, worktree: Path) ->
     if cfg.research.enabled:
         kw["deliverables"] += render("worker_delivery", **kw)
     return render("worker", **kw)
+
+
+def rsi_bin() -> str:
+    """How a worker calls the harness CLI from its worktree: the checkout launcher, or the installed `rsi`."""
+    from .home import in_checkout, REPO
+    return str(REPO / "rsi") if in_checkout() else "rsi"
+
+
+def worker_resume_prompt(cfg: ExperimentCfg, node: Node, finished: list[dict], timeout_s: float) -> str:
+    """Wake the worker's own session after the jobs it submitted with `rsi job submit` have ended."""
+    nd = node_dir(cfg, node.id)
+    rows = []
+    for j in finished:
+        row = f"- job `{j.get('job')}`: {j.get('status')}" + (f" ({j['reason']})" if j.get("reason") else "")
+        row += f"; command `{' '.join(j.get('cmd') or [])}`; log `{j.get('log', '?')}`"
+        if j.get("result_path"):
+            row += f"; result file `{j['result_path']}`"
+        if j.get("metrics_path"):
+            row += f"; progress file `{j['metrics_path']}`"
+        rows.append(row)
+    deliverables = (f"write `{nd}/IMPLEMENTATION.md` and `{nd}/DELIVERY.json`" if cfg.research.enabled
+                    else f"write `{nd}/HANDOFF.md` and `{nd}/proposals.json`")
+    rounds_left = max(0, cfg.runner.max_job_rounds - node.worker.get("job_rounds", 1))
+    return render("worker_resume", worktree=str(cfg.worktrees_dir / node.id), jobs_table="\n".join(rows) or "(no job records)",
+                  minutes=max(1, int(timeout_s // 60)), node_dir=str(nd), deliverables_line=deliverables,
+                  rsi_bin=rsi_bin(), rounds_left=rounds_left)
 
 
 def _quick_cmd(cfg: ExperimentCfg) -> str:

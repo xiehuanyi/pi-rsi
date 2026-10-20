@@ -260,6 +260,73 @@ class MemoryTests(unittest.TestCase):
             self.assertIn("Research memory", prompt)
 
 
+class LayeredMemoryTests(MemoryTests):
+    """L1 direction pages between the agenda and the claims; every direction stays visible."""
+
+    def topic(self, **kw):
+        base = {"id": "spatial", "title": "Spatial assignment", "scope": "50 tiles", "status": "active",
+                "summary": "Assign actors to regions before routing.", "tried": ["spatial-assignment", "unknown-claim"],
+                "best": {"node": "n001", "score": 1.0}, "why_stalled": "", "subtree": ["n001"]}
+        base.update(kw)
+        return base
+
+    def test_topic_pages_are_validated_rendered_and_lead_the_context(self):
+        self.node()
+        self.mem.sync(self.tree)
+        eid = self.mem.pending()[0]["id"]
+        u = FakeUtility({"claims": [claim(eid, topic="spatial")], "agenda": agenda(), "topics": [self.topic()]})
+        self.assertTrue(self.mem.reflect(u, force=True))
+        state = self.mem.state()
+        self.assertEqual(state["topics"]["spatial"]["tried"], ["spatial-assignment"])  # an unknown claim is dropped
+        self.assertEqual(state["claims"]["spatial-assignment"]["topic"], "spatial")
+        revision = self.mem.root / "revisions" / state["revision"]
+        self.assertIn("Spatial assignment", (revision / "topics" / "spatial.md").read_text())
+        self.assertIn("topics/spatial.md", (revision / "INDEX.md").read_text())
+        self.assertEqual(json.loads((revision / "index" / "index.json").read_text())["topics"][0]["id"], "spatial")
+        text = self.mem.context("routing spatial")
+        self.assertLess(text.index("research agenda (L0)"), text.index("Research directions (L1"))
+        self.assertLess(text.index("Research directions (L1"), text.index("Relevant knowledge (L2"))
+        self.assertIn('"id": "spatial"', text)
+        # A claim naming an unknown direction keeps no dangling reference; a malformed topic is rejected whole.
+        self.node("n002", 2.0)
+        self.mem.sync(self.tree)
+        second = self.mem.pending()[0]["id"]
+        u = FakeUtility({"claims": [claim(second, topic="nowhere")], "agenda": agenda(),
+                         "topics": [self.topic(status="stalled", why_stalled="score flat for three nodes", tried=[])]})
+        self.assertTrue(self.mem.reflect(u, force=True, retry_now=True))
+        state = self.mem.state()
+        self.assertNotIn("topic", state["claims"]["spatial-assignment"])
+        self.assertEqual(state["topics"]["spatial"]["status"], "stalled")
+        self.assertEqual(state["topics"]["spatial"]["tried"], ["spatial-assignment"])  # earlier references retained
+        self.node("n003", 3.0)
+        self.mem.sync(self.tree)
+        third = self.mem.pending()[0]["id"]
+        bad = FakeUtility({"claims": [claim(third)], "agenda": agenda(), "topics": [self.topic(id="Bad Id")]})
+        with self.assertRaises(ValueError):
+            self.mem.reflect(bad, force=True, retry_now=True)
+        self.assertEqual(self.mem.state()["revision"], state["revision"])
+
+    def test_every_direction_stays_visible_when_claims_overflow_the_budget(self):
+        self.node()
+        self.mem.sync(self.tree)
+        eid = self.mem.pending()[0]["id"]
+        names = ["routing", "assignment", "pricing"]
+        topics = [{"id": f"dir-{i}", "title": names[i].title(), "status": "active", "summary": names[i] + " " * 2 + "x" * 300,
+                   "tried": [], "subtree": []} for i in range(3)]
+        claims = [claim(eid, id=f"claim-{i:02d}", title=f"Claim {i}", statement="s" * 1500, topic=f"dir-{i % 3}")
+                  for i in range(12)]
+        u = FakeUtility({"claims": claims, "agenda": agenda(), "topics": topics})
+        self.assertTrue(self.mem.reflect(u, force=True))
+        text = self.mem.context("pricing")
+        self.assertLessEqual(len(text), self.cfg.memory.context_chars)
+        for i in range(3):
+            self.assertIn(f'"id": "dir-{i}"', text)  # L1 is never crowded out by L2
+        self.assertIn('"id": "claim-02"', text)  # a claim of the matching direction is recalled first
+        if '"id": "claim-00"' in text:
+            self.assertLess(text.index('"id": "claim-02"'), text.index('"id": "claim-00"'))
+        self.assertLess(text.count('"kind": "hypothesis"'), 12)  # claims beyond the budget are left to the pages
+
+
 class ResearchSchedulerTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

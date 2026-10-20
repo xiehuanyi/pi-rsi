@@ -129,5 +129,93 @@ class TestSchedulerExhaustion(unittest.TestCase):
         self.assertEqual(self.utility.calls, [])
 
 
+class TestPriorityScheduling(unittest.TestCase):
+    """Parent choice = exploit + explore + information; depth rounds exploit, breadth rounds explore."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tree = Tree(Path(self.tmp.name) / "tree.json", meta={"higher_is_better": True})
+        self.cfg = SimpleNamespace(
+            search=SearchCfg(width_root=2, width=5, depth=4, max_nodes=20, max_retries=1, patience=4, breadth_after=1),
+            nodes_dir=Path(self.tmp.name))
+        self.utility = FakeUtility()
+        self.orch = SimpleNamespace(cfg=self.cfg, tree=self.tree, utility=self.utility, log=lambda *a, **k: None)
+        self.sched = Scheduler(self.orch)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def add(self, nid, parent, depth, score, *, order, status="done", proposals=None):
+        node = Node(nid, parent, depth, nid, "", status=status, score=score, finished_order=order,
+                    finished_at=f"2026-10-20T00:00:{order:02d}", proposals=list(proposals or []))
+        self.tree.add(node)
+        self.tree._counter = max(self.tree._counter, int(nid[1:]) if nid != "root" else 0)
+        return node
+
+    def explored_best_and_fresh_sibling(self):
+        """n001 is the best but its three children all failed; n002 scored lower and was never expanded."""
+        self.add("root", None, 0, 0.0, order=0)
+        self.add("n001", "root", 1, 10.0, order=1, proposals=[_proposal("from-high")])
+        self.add("n002", "root", 1, 5.0, order=2, proposals=[_proposal("from-low")])
+        for i in (3, 4, 5):
+            self.add(f"n00{i}", "n001", 2, None, order=i, status="failed")
+
+    def test_breadth_round_leaves_the_exhausted_best_for_an_unexplored_branch(self):
+        self.explored_best_and_fresh_sibling()
+        self.assertEqual(self.sched.phase(), "breadth")  # three results without a new best
+        ranking = self.sched.priorities("breadth")
+        self.assertGreater(ranking["n002"]["total"], ranking["n001"]["total"])
+        self.assertEqual((ranking["n001"]["explored"], ranking["n001"]["fail"]), (3, 1.0))
+        self.assertGreater(ranking["n002"]["novelty"], 0)  # results arrived since n002 was last touched
+        node = self.sched.next_node()
+        self.assertEqual((node.parent, node.title), ("n002", "from-low"))
+        self.assertEqual(node.worker["dispatch"]["phase"], "breadth")
+
+    def test_depth_round_follows_the_best_branch(self):
+        self.explored_best_and_fresh_sibling()
+        self.cfg.search.breadth_after = 99
+        self.assertEqual(self.sched.phase(), "depth")
+        ranking = self.sched.priorities("depth")
+        self.assertGreater(ranking["n001"]["total"], ranking["n002"]["total"])
+        node = self.sched.next_node()
+        self.assertEqual((node.parent, node.worker["dispatch"]["phase"]), ("n001", "depth"))
+
+    def test_best_descendant_outranks_its_explored_parent_in_a_depth_round(self):
+        self.add("root", None, 0, 0.0, order=0)
+        self.add("n001", "root", 1, 10.0, order=1, proposals=[_proposal("a")])
+        self.add("n002", "root", 1, 5.0, order=2, proposals=[_proposal("b")])
+        self.add("n003", "n001", 2, 12.0, order=3, proposals=[_proposal("c")])
+        self.cfg.search.breadth_after = 99
+        order = [n.id for n, _ in self.sched.ranked("depth")]
+        self.assertEqual(order[0], "n003")   # same subtree best as n001, nothing explored below it yet
+
+    def test_equal_scores_fall_back_to_breadth_first(self):
+        self.add("root", None, 0, 0.0, order=0)
+        self.add("n001", "root", 1, 5.0, order=1, proposals=[_proposal("a")])
+        self.add("n002", "root", 1, 5.0, order=2, proposals=[_proposal("b")])
+        self.add("n003", "n001", 2, 4.0, order=3, proposals=[_proposal("c")])
+        self.cfg.search.breadth_after = 99
+        self.assertEqual(self.sched.ranked("depth")[0][0].id, "n002")  # fewer explored descendants wins the tie
+
+    def test_phase_alternates_every_k_nodes_or_adapts_to_a_stall(self):
+        self.add("root", None, 0, 0.0, order=0)
+        self.add("n001", "root", 1, 10.0, order=1)
+        self.add("n002", "root", 1, 5.0, order=2)
+        self.cfg.search.phase_k = 1
+        self.assertEqual(self.sched.phase(), "depth")      # 2 launched // 1 is even
+        self.add("n003", "n001", 2, 1.0, order=3)
+        self.assertEqual(self.sched.phase(), "breadth")    # 3 launched
+        self.cfg.search.phase_k = 0
+        self.cfg.search.breadth_after = 2
+        self.assertEqual(self.sched.phase(), "depth")      # one stalled result below depth 1
+        n = self.add("n004", "n001", 2, 1.0, order=4)
+        self.assertEqual(self.sched.phase(), "breadth")    # two
+        self.tree.update(n, delta_best=1.0)
+        self.assertEqual(self.sched.phase(), "depth")      # a new best resets the stall
+        self.cfg.search.phase_adaptive = False
+        self.tree.update(n, delta_best=None)
+        self.assertEqual(self.sched.phase(), "depth")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -152,6 +152,51 @@ class ResearchDecisionTests(unittest.TestCase):
         self.assertEqual(self.orch.research.runner.run_agent.call_count, 1)
         self.assertIsNone(self.orch.scheduler.next_node())  # no second implementation while one is pending
 
+    def test_digest_ranks_parents_by_priority_and_records_a_departure(self):
+        for i, score in ((1, 100), (2, 20)):
+            self.finished(f"n00{i}", score=score)
+        self.cfg.search.priority_top_m = 1
+        self.lead(prose("n002"))
+        self.extractor(extracted("n002"))
+        node = self.orch.scheduler.next_node()
+        self.assertEqual(node.parent, "n002")  # the lead may still build on a low-ranked parent
+        prompt = self.orch.research.runner.run_agent.call_args[0][0]
+        self.assertIn("PHASE depth", prompt)
+        self.assertIn('"rank": 1', prompt)
+        research = node.worker["research"]
+        self.assertEqual(research["phase"], "depth")
+        self.assertEqual(research["parent_rank"], 3)  # n001 (best), root (holds the best), n002
+        saved = json.loads((self.cfg.dir / "cycles" / research["cycle"] / "decision.json").read_text())
+        self.assertTrue(any("ranked 3 of 3" in w for w in saved.get("warnings", [])), saved.get("warnings"))
+        snapshot = json.loads((self.cfg.dir / "cycles" / research["cycle"] / "snapshot.json").read_text())
+        self.assertEqual([p["id"] for p in self.orch.research.ranked_parents(snapshot)], ["n001", "root", "n002"])
+
+    def test_path_summary_compresses_the_ancestor_chain_for_children(self):
+        n001 = self.finished("n001", score=12)
+        nd = self.cfg.nodes_dir / "n001"
+        atomic_write_json(nd / "analysis.json", {**analysis(), "measurement_identity": "m1"})
+        self.orch.maintainer = SimpleNamespace(_ask=Mock(return_value={
+            "path": "- n001 (score 12, improved): approach 0; keep the ablation."}))
+        self.orch.research._path_summary(n001)
+        self.assertIn("keep the ablation", (nd / "PATH.md").read_text())
+        self.orch.research._path_summary(n001)  # the same measurement is not summarised twice
+        self.assertEqual(self.orch.maintainer._ask.call_count, 1)
+        child = self.orch.tree.add(Node("n002", "n001", 2, "child", "h", commit="c2"))
+        from pi_rsi import prompts as P
+        self.assertIn("keep the ablation", P.worker_prompt(self.cfg, self.orch.tree, child, self.cfg.worktrees_dir / "n002"))
+        atomic_write_json(self.cfg.nodes_dir / "n002" / "analysis.json", {**analysis(), "measurement_identity": "m2"})
+        self.orch.maintainer = SimpleNamespace(_ask=Mock(side_effect=RuntimeError("maintainer down")))
+        self.orch.research._path_summary(child)  # a failed call leaves a mechanical summary, never an error
+        text = (self.cfg.nodes_dir / "n002" / "PATH.md").read_text()
+        self.assertIn("keep the ablation", text)
+        self.assertIn("n002", text)
+        self.assertEqual(json.loads((self.cfg.nodes_dir / "n002" / "path.json").read_text())["source"], "mechanical")
+        self.cfg.memory.path_chars = 600
+        self.orch.maintainer = SimpleNamespace(_ask=Mock(return_value={"path": "x" * 5000}))  # oversized: rejected
+        atomic_write_json(self.cfg.nodes_dir / "n002" / "analysis.json", {**analysis(), "measurement_identity": "m3"})
+        self.orch.research._path_summary(child)
+        self.assertLessEqual(len((self.cfg.nodes_dir / "n002" / "PATH.md").read_text()), 600)
+
     def test_proposal_from_latest_analysis_runs_without_a_full_review(self):
         n001 = self.finished("n001")
         self.propose(n001, prose("n001"))
@@ -557,6 +602,7 @@ class ResearchIntegrationTests(unittest.TestCase):
     def test_real_cpu_queue_loop_wakes_only_after_completion(self):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"RSI_JOBS_DIR": str(Path(d) / "jobs"), "RSI_GPUS": ""}):
             cfg = make_cfg(Path(d)); cfg.search.patience = 10
+            cfg.search.max_waiting = 0  # strictly sequential: every decision sees the previous result
             cfg.setup = SetupCfg(enabled=True, calibration_runs=2, course_k=2)
             orch = Orchestrator(cfg, verbose=False)
             try:

@@ -57,9 +57,10 @@ def _execution_fingerprint(snapshot):
     # Wiki compilation/indexing cannot invalidate a locked plan on the same raw
     # evidence. Measurements, eligible parents, human scope and budgets still can.
     data = {k: v for k, v in snapshot.items()
-            if k not in ("wiki_revision", "known_claims", "known_evidence", "evidence_fingerprint", "fingerprint")}
+            if k not in ("wiki_revision", "known_claims", "known_evidence", "evidence_fingerprint", "fingerprint",
+                         "phase")}
     data["parents"] = [{k: v for k, v in parent.items()
-                        if k not in ("summary", "comparison", "documentation", "handoff_path")}
+                        if k not in ("summary", "comparison", "documentation", "handoff_path", "priority")}
                        for parent in data.get("parents", [])]
     data["history"] = [{k: v for k, v in node.items() if k not in ("summary", "comparison", "status", "finished_order", "documentation", "execution")}
                        for node in data.get("history", [])]
@@ -95,11 +96,14 @@ class ResearchLoop:
                         "summary": n.summary[:1200], "comparison": n.audit.get("comparison", {}),
                         "handoff_path": str(self.cfg.nodes_dir / n.id / "HANDOFF.md")}
                        for n in self.o.tree.hypotheses() if scheduler.expandable(n)]
+            phase = scheduler.phase()
+            ranking = scheduler.priorities(phase, [self.o.tree.get(p["id"]) for p in parents])
             for parent in parents:
                 node = self.o.tree.get(parent["id"])
                 parent["hypothesis_id"] = node.hypothesis_key
                 parent["documentation"] = node.documentation
                 parent["children_explored"] = len(scheduler.counted_children(node))
+                parent["priority"] = ranking.get(parent["id"], {})
             history = [{"id": n.id, "parent": n.parent, "title": n.title, "status": n.status,
                         "hypothesis_id": n.hypothesis_key,
                         "measurement_state": "validated" if n.measurement_valid else n.measurement.get("state", "unmeasured"),
@@ -113,6 +117,10 @@ class ResearchLoop:
                   "known_evidence": [p["id"] for p in self.o.memory.packets()] if self.o.memory.enabled else [],
                   "evidence_fingerprint": self.o.memory.evidence_fingerprint() if self.o.memory.enabled else "",
                   "known_claims": list(state["claims"]), "human": read_text(self.cfg.dir / "HUMAN.md"),
+                  "phase": phase,
+                  "pending": [{"id": n.id, "parent": n.parent, "title": n.title[:160],
+                               "kind": (n.worker.get("waiting") or {}).get("kind", "evaluation")}
+                              for n in self.o.tree.by_status("waiting")],
                   "nodes_remaining": self.cfg.search.max_nodes - scheduler.launched_count(),
                   "stall_count": scheduler.consecutive_without_best(),
                   "worker_seconds": self.cfg.runner.node_timeout_s,
@@ -142,32 +150,48 @@ class ResearchLoop:
         best = max((p for p in snapshot["parents"] if isinstance(p.get("score"), (int, float))),
                    key=lambda p: direction * p["score"], default=None)
         path_ids = [a.id for a in self.o.tree.ancestors(best["id"])] + [best["id"]] if best else []
-        by_score = sorted(snapshot["parents"], key=lambda p: (-direction * p["score"]
-                          if isinstance(p.get("score"), (int, float)) else float("inf"), p["id"]))
+        by_priority = self.ranked_parents(snapshot)
+        rank_of = {p["id"]: i + 1 for i, p in enumerate(by_priority)}
         recent = sorted(snapshot["parents"], key=lambda p: -order.get(p["id"], 0))
         ranked, seen = [], set()
         for p in ([p for p in snapshot["parents"] if p["id"] in (snapshot["focus"], *path_ids)]
-                  + by_score[:8] + recent[:6] + by_score):
+                  + by_priority[:8] + recent[:6] + by_priority):
             if p["id"] not in seen:
                 seen.add(p["id"])
                 ranked.append(p)
         history = sorted(snapshot["history"], key=lambda n: (n.get("finished_order") or 1e9), reverse=True)
         human = snapshot["human"].strip()
+        top_m = getattr(self.cfg.search, "priority_top_m", 3)
+        phase = snapshot.get("phase", "depth")
+        phase_line = ("PHASE breadth: this round spreads the search. Eligible parents are ranked by priority "
+                      "(exploit + explore + information + new evidence); the top of the list is under-explored. "
+                      if phase == "breadth" else
+                      "PHASE depth: this round follows the best branch. Eligible parents are ranked by priority "
+                      "(exploit + explore + information + new evidence); the best branch leads the list. ")
+        phase_line += (f"Prefer one of the top {top_m}; building on another eligible parent is allowed when you state "
+                       "the reason (it is recorded as a warning, never a veto).")
         lines = [f"Complete snapshot (every eligible parent, node record and citable evidence/claim ID): {path}",
                  "This digest is bounded. Read the snapshot file, nodes/<id>/HANDOFF.md or the wiki for more detail.",
                  "LIMITS " + json.dumps({k: snapshot[k] for k in ("nodes_remaining", "stall_count", "worker_seconds",
                                          "max_tuning_trials", "budget", "focus", "wiki_revision")}, ensure_ascii=False),
+                 phase_line,
+                 "PENDING RESULTS (submitted to the queue, not yet measured; their outcome is unknown to you, so do not "
+                 "duplicate them and do not count on them): " + (json.dumps(snapshot.get("pending", []), ensure_ascii=False)
+                                                                  if snapshot.get("pending") else "(none)"),
                  f"CITABLE IDS {len(snapshot['known_evidence'])} evidence packets and {len(snapshot['known_claims'])} "
                  "wiki claims; the lists are known_evidence/known_claims in the snapshot file.",
                  "HUMAN DIRECTION " + (_clip(human, 4000, tail=True) if human else "(none)")]
         sections = [
-            (f"ELIGIBLE PARENTS ({len(ranked)}; focus, best path, best scores and recent first)",
+            (f"ELIGIBLE PARENTS ({len(ranked)}; focus, best path, highest priority and recent first; "
+             f"rank = position by priority this round)",
              [{"id": p["id"], "parent": p["parent"], "depth": p["depth"], "score": p["score"],
+               "rank": rank_of.get(p["id"]), "priority": (p.get("priority") or {}).get("total"),
+               "explored": (p.get("priority") or {}).get("explored", p["children_explored"]),
                "title": _clip(p["title"], 160), "children_explored": p["children_explored"],
                "noise": (p.get("comparison") or {}).get("classification"), "summary": _clip(p["summary"] or "", 400)}
               for p in ranked[:12]] +
-             [{"id": p["id"], "parent": p["parent"], "score": p["score"], "title": _clip(p["title"], 80)}
-              for p in ranked[12:]]),
+             [{"id": p["id"], "parent": p["parent"], "score": p["score"], "rank": rank_of.get(p["id"]),
+               "title": _clip(p["title"], 80)} for p in ranked[12:]]),
             (f"HISTORY ({len(history)} nodes, most recent first)",
              [{"id": n["id"], "parent": n["parent"], "status": n["status"], "measurement": n["measurement_state"],
                "score": n["score"], "title": _clip(n["title"], 120), "summary": _clip(n["summary"], 300)}
@@ -190,6 +214,14 @@ class ResearchLoop:
                 lines.append(line)
                 size += len(line) + 1
         return "\n".join(lines)
+
+    @staticmethod
+    def ranked_parents(snapshot):
+        """Eligible parents by this round's priority (then id); parents without a priority sort last."""
+        return sorted(snapshot["parents"], key=lambda p: (-((p.get("priority") or {}).get("total") or -1e9), p["id"]))
+
+    def parent_rank(self, snapshot, parent_id):
+        return next((i + 1 for i, p in enumerate(self.ranked_parents(snapshot)) if p["id"] == parent_id), None)
 
     def _guidance(self):
         if self.cfg.task.competition:
@@ -697,6 +729,17 @@ Reply COURSE_READY when saved."""
         prop = next(c for c in decision["candidates"] if c["id"] == decision["selected"])
         kind = (read_json(cycle / "origin.json", {}) or {}).get("kind", "review")
         plan = cycle / "DECISION.md" if (cycle / "DECISION.md").exists() else cycle / "THINK.md"
+        # The lead may build on any eligible parent; a choice far down the priority ranking is recorded, not vetoed.
+        phase, rank = snapshot.get("phase", "depth"), self.parent_rank(snapshot, prop["parent"])
+        top_m = getattr(self.cfg.search, "priority_top_m", 3)
+        departed = bool(rank and rank > top_m)
+        if departed:
+            note = (f"parent {prop['parent']} is ranked {rank} of {len(snapshot['parents'])} by priority in a "
+                    f"{phase} round (top {top_m} preferred)")
+            decision["warnings"] = list(dict.fromkeys([*decision.get("warnings", []), note]))
+            atomic_write_json(cycle / "decision.json", decision)
+        self.o.log("research_parent_rank", cycle=cycle.name, parent=prop["parent"], rank=rank, phase=phase,
+                   departed=departed)
         with self.o.tree.lock:
             parent = self.o.tree.get(prop["parent"])
             if not scheduler.expandable(parent):
@@ -709,7 +752,7 @@ Reply COURSE_READY when saved."""
                 title=prop["title"], hypothesis=prop["hypothesis"], kind=prop["type"], base_commit=parent.commit,
                 worker={"proposal": prop, "research": {"cycle": cycle.name, "decision_kind": kind,
                     "decision_path": str(cycle / "decision.json"), "think_path": str(plan),
-                    "tuning_budget": prop["budget"]}})
+                    "tuning_budget": prop["budget"], "phase": phase, "parent_rank": rank}})
             self.o.tree.meta.pop("research_proposal", None)
             self.o.tree.add(node)
         self.o.log("node_planned", node=node.id, parent=node.parent, title=node.title,
@@ -752,6 +795,7 @@ Reply COURSE_READY when saved."""
             if metrics.get("_eval", {}).get("monitor"):
                 from .monitor import TaskMonitor
                 TaskMonitor(Path(metrics["_eval"]["monitor"])).consumed()
+            self._path_summary(node)
             return
         preliminary = read_text(nd / "HANDOFF.md")
         if preliminary and not (nd / "HANDOFF.preliminary.md").exists():
@@ -773,9 +817,12 @@ Reply COURSE_READY when saved."""
                      "development and diagnostic results; in ## Result say there is no official result, and never\n"
                      "present development numbers as official.")
             official = "Official metrics: none for this node (evaluation skipped)."
+        parent_path = (read_text(self.cfg.nodes_dir / node.parent / "PATH.md") if node.parent and node.parent != "root"
+                       else "")
         prompt = f"""You are the research lead in pi-rsi. {phase}
 Task: {read_text(self.cfg.task_dir / self.cfg.task.brief)}{objective_block(self.cfg)}
 Node {node.id}: {node.title}\nHypothesis: {node.hypothesis}
+Path so far (the ancestors' analyses, compressed): {_clip(parent_path, 3000) if parent_path.strip() else '(parent is the root baseline)'}
 The decision that chose it: {node.worker.get('research', {}).get('think_path', '(retry: see parent notes)')}.
 What the worker built: {nd / 'IMPLEMENTATION.md'} (code at {self.cfg.worktrees_dir / node.id}; log PROGRESS.md).
 Do not edit code or run experiments.
@@ -846,11 +893,85 @@ before the last 20 percent of the budget. Once saved, reply ANALYSIS_READY and s
         atomic_write_text(nd / "HANDOFF.md", handoff + footer)
         atomic_write_json(nd / "analysis.json", {**out, "measurement_identity": identity})
         self.o.tree.update(node, worker={**node.worker, "analysis": out})
+        self._path_summary(node)
         if read_text(nd / "NEXT.md").strip():
             self.o.tree.meta["research_proposal"] = {"node": node.id, "path": str(nd / "NEXT.md"), "at": now_iso()}
             self.o.tree.save()
         if monitor:
             monitor.consumed()
+
+    # path summaries ----------------------------------------------------------------
+    def _path_summary(self, node):
+        """PATH.md: the chain from the root to this node, compressed into bounded working memory for the
+        node's children and its own later analyses. The maintainer writes it; any failure leaves a mechanical
+        summary instead, so the study never waits on it."""
+        cfg = self.cfg
+        if not getattr(cfg.memory, "path_summary", True):
+            return
+        nd = cfg.nodes_dir / node.id
+        analysis = read_json(nd / "analysis.json", {}) or {}
+        identity = analysis.get("measurement_identity", "")
+        existing = read_json(nd / "path.json", {}) or {}
+        if existing.get("measurement_identity") == identity and (nd / "PATH.md").exists():
+            return
+        parent_path = (read_text(cfg.nodes_dir / node.parent / "PATH.md") if node.parent and node.parent != "root"
+                       else "")
+        comparison = read_json(nd / "eval" / "comparison.json", {}) or {}
+        own = {"node": node.id, "title": node.title, "hypothesis": node.hypothesis[:800], "score": node.score,
+               "verdict": comparison.get("verdict") or (node.audit.get("comparison") or {}).get("verdict") or node.verdict,
+               "observations": list(analysis.get("observations", []))[:6],
+               "interpretation": str(analysis.get("interpretation", ""))[:800],
+               "belief_revisions": list(analysis.get("belief_revisions", []))[:4],
+               "limitations": list(analysis.get("limitations", []))[:3]}
+        limit = getattr(cfg.memory, "path_chars", 2500)
+        text = _mechanical_path(parent_path, own, limit)
+        source = "mechanical"
+        try:
+            data = self.o.maintainer._ask("path_summary", _path_prompt(parent_path, own, limit), PATH_SCHEMA, node.id)
+            candidate = data.get("path") if isinstance(data, dict) else None
+            if isinstance(candidate, str) and candidate.strip() and len(candidate) <= limit * 1.2 and node.id in candidate:
+                text, source = candidate.strip()[:limit], "maintainer"
+            else:
+                self.o.log("path_summary_fallback", node=node.id, reason="rejected")
+        except Exception as e:  # a view for later prompts; never changes the node's outcome
+            self.o.log("path_summary_fallback", node=node.id, error=str(e)[:300])
+        atomic_write_text(nd / "PATH.md", text)
+        atomic_write_json(nd / "path.json", {"measurement_identity": identity, "chars": len(text), "source": source,
+                                             "at": now_iso()})
+        self.o.log("path_summary", node=node.id, chars=len(text), source=source)
+
+
+def _mechanical_path(parent_path, own, limit):
+    score = f"score {own['score']}" if own.get("score") is not None else "unmeasured"
+    entry = f"- {own['node']} ({score}, {own.get('verdict') or '-'}): {own['title']}."
+    if own.get("observations"):
+        entry += " " + "; ".join(str(x) for x in own["observations"][:2])
+    if own.get("interpretation"):
+        entry += " Interpretation: " + own["interpretation"][:300]
+    head = parent_path.strip() + "\n" if parent_path.strip() else "# Path summary (root to this node)\n"
+    text = head + entry + "\n"
+    return text if len(text) <= limit else "…" + text[-(limit - 1):]
+
+
+def _path_prompt(parent_path, own, limit):
+    return f"""You maintain pi-rsi's path summaries: the working memory a node's children receive about their ancestors.
+Return JSON only: {{"path": "<markdown, at most {limit} characters>"}}.
+Compress the PARENT PATH and THIS NODE into one path summary from the root to this node: one short entry per
+ancestor (node ID, what was tried, official score and verdict, the one lesson that still matters), newest last.
+Keep official numbers exactly as given; drop detail before dropping an ancestor; never add conclusions the
+inputs do not contain. Node IDs are citations: keep every one of them.
+PARENT PATH
+<<<
+{parent_path.strip() or '(this node\'s parent is the root baseline)'}
+>>>
+THIS NODE
+<<<
+{json.dumps(own, ensure_ascii=False)}
+>>>
+"""
+
+
+PATH_SCHEMA = {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
 
 
 _STR = {"type": "string"}

@@ -31,8 +31,17 @@ INSIGHTS.md/DEADENDS.md ledgers, and score reporting remain available.
    Incorrect historical evidence relations are corrected by superseding the old claim and writing a
    successor, keeping the old references in history. Any automatic mixed-status reconciliation is
    explicitly recorded in the agenda rather than silently disagreeing with the model's summary.
-4. Planners receive the current agenda and relevant knowledge with both supporting and opposing
-   references. Workers receive a bounded snapshot saved beside their node notes.
+4. Recall is layered and bounded (`context_chars`): L0 the agenda (`agenda_chars`), L1 every direction
+   page summary, most relevant first (`topic_chars`; a long list is cut, never a direction's existence),
+   L2 claims chosen by lexical overlap with the query and a bonus for claims of the matching directions,
+   L3 raw packets by ID. Direction pages (`topics` in `state.json`, rendered under `topics/`) are
+   maintained by the same reflection call: one per research direction, with scope, summary, the claims
+   that belong to it (`tried`, accumulated), its best measured node, why it stalled and where it was
+   explored; a claim's `topic` names its direction and an unknown one is dropped. Planners and the lead
+   receive this context; workers receive a bounded snapshot saved beside their node notes.
+   After each analysis the maintainer also compresses the node's ancestor chain into `nodes/<id>/PATH.md`
+   (`path_chars`; a rejected or failed call leaves a mechanical summary), which the node's children and
+   later analyses read as working memory.
 5. An unused proposal queue from an older compiled revision is re-planned before expansion. Previous
    proposals and their indices remain in the tree as history.
 6. Every third expansion prefers an available ablate/debug proposal that names a research question,
@@ -58,6 +67,7 @@ Each evaluator/config/data-version fingerprint has an isolated protocols/<finger
         INDEX.md
         AGENDA.md
         wiki/<claim-id>.md
+        topics/<topic-id>.md           # direction pages (L1)
 
 Node notes also contain MEMORY.md (exact supplied text) and memory.json (revision, protocol,
 context hash). The code tree tracks code inheritance; wiki pages integrate evidence across branches.
@@ -115,6 +125,10 @@ For a separate wiki or an isolated comparison:
     context_chars = 12000
     research_every = 3         # 0 disables reserved research turns
     patience_grace = 2         # set to 0 for unchanged score patience
+    agenda_chars = 3000        # L0 budget inside context_chars
+    topic_chars = 4000         # L1 budget inside context_chars
+    path_summary = true        # PATH.md per analysed node
+    path_chars = 2500
 
 The automatic fingerprint covers task evaluation configuration and evaluator .py/.json/.toml files.
 It does NOT fingerprint arbitrary external datasets or linked model weights. Set protocol_id to

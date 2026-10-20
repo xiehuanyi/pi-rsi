@@ -82,10 +82,12 @@ class ResearchMemory:
         pointer = read_json(self.root / "CURRENT.json")
         if not pointer:
             return self._empty()
-        return read_json(self.root / "revisions" / pointer["revision"] / "state.json")
+        state = read_json(self.root / "revisions" / pointer["revision"] / "state.json")
+        state.setdefault("topics", {})  # revisions compiled before direction pages existed
+        return state
 
     def _empty(self):
-        return {"revision": "", "claims": {}, "agenda": {}, "consumed": [], "protocol": self.protocol}
+        return {"revision": "", "claims": {}, "agenda": {}, "topics": {}, "consumed": [], "protocol": self.protocol}
 
     @property
     def revision(self) -> str:
@@ -183,26 +185,51 @@ class ResearchMemory:
         return [p for p in self.packets() if p["id"] not in consumed]
 
     def context(self, query: str, state=None) -> str:
+        """Bounded, layered recall: L0 the agenda; L1 every research direction (topic page summaries, most
+        relevant first, each bounded); L2 the claims that fit the query and its directions; L3 raw evidence by ID."""
         if not self.enabled:
             return ""
         state = state or self.state()
-        limit = self.cfg.memory.context_chars
+        memory = self.cfg.memory
+        limit = memory.context_chars
+        rev = self.root / "revisions" / state["revision"]
         lines = [
             "# Research memory",
             f"Revision: {state['revision'] or 'uncompiled'}; protocol: {self.protocol}.",
-            f"Evidence packets: {self.root / 'raw'} (read by cited ID when needed).",
-            f"Generated knowledge: {self.root / 'revisions' / state['revision'] / 'wiki'}.",
-            f"Navigation index: {self.root / 'revisions' / state['revision'] / 'index'} (not evidence).",
+            f"Evidence packets (L3): {self.root / 'raw'} (read by cited ID when needed).",
+            f"Generated knowledge (L2): {rev / 'wiki'}; direction pages (L1): {rev / 'topics'}.",
+            f"Navigation index: {rev / 'index'} (not evidence).",
             "Evidence and interpretations are distinct. Scope is mandatory; failed implementations do not refute a method.",
             "Use supporting AND opposing evidence. Legacy insights/dead ends are provisional, conditional notes.",
         ]
         if state["agenda"]:
-            lines += ["## Current research agenda", json.dumps(state["agenda"], ensure_ascii=False)[:limit // 3]]
+            lines += ["## Current research agenda (L0)",
+                      json.dumps(state["agenda"], ensure_ascii=False)[:min(getattr(memory, "agenda_chars", 3000), limit // 3)]]
         terms = _tokens(query)
+
+        def overlap(obj):
+            return len(terms & _tokens(json.dumps(obj, ensure_ascii=False)))
+
+        topics = sorted(state.get("topics", {}).values(),
+                        key=lambda t: (-overlap(t), t.get("status") == "closed", t["id"]))
+        matched = {t["id"] for t in topics[:3] if overlap(t)}
+        if topics:
+            lines += ["## Research directions (L1; every direction, most relevant first; a topic page has the detail)"]
+            budget, used = min(getattr(memory, "topic_chars", 4000), limit // 3), 0
+            for i, t in enumerate(topics):
+                block = json.dumps({k: t.get(k) for k in ("id", "title", "status", "best", "why_stalled", "summary")},
+                                   ensure_ascii=False)
+                if len(block) > 700:
+                    block = block[:699] + "…"
+                if used + len(block) + 1 > budget:
+                    lines.append(f"... {len(topics) - i} more directions in {rev / 'topics'}")
+                    break
+                lines.append(block)
+                used += len(block) + 1
         claims = sorted(state["claims"].values(), key=lambda c: (
-            -len(terms & _tokens(json.dumps(c, ensure_ascii=False))),
+            -(overlap(c) + (3 if c.get("topic") in matched else 0)),
             c["status"] == "superseded", c["status"] not in ("mixed", "untested"), c["id"]))
-        lines += ["## Relevant knowledge (including counterevidence)"]
+        lines += ["## Relevant knowledge (L2, including counterevidence)"]
         for claim in claims:
             block = json.dumps(claim, ensure_ascii=False)
             if len("\n".join(lines)) + len(block) > limit - 1600:
@@ -306,6 +333,7 @@ class ResearchMemory:
             if self.revision != state["revision"]:
                 return False  # another run published first; rebuild from its revision next time
             new = {**state, "claims": {**state["claims"], **validated["claims"]},
+                   "topics": {**state.get("topics", {}), **validated.get("topics", {})},
                    "agenda": validated["agenda"], "updated_at": now_iso(),
                    "consumed": sorted(set(state["consumed"]) | {p["id"] for p in batch}),
                    "previous_revision": state["revision"]}
@@ -404,6 +432,10 @@ class ResearchMemory:
             c = {k: c[k] for k in ("id", "title", "kind", "status", "statement", "scope",
                                   "supports", "opposes", "alternatives", "next_test")}
             original = next(x for x in data["claims"] if x["id"] == cid)
+            topic = original.get("topic") if isinstance(original.get("topic"), str) else ""
+            topic = (topic or old.get("topic", "")).strip()[:64]
+            if topic:
+                c["topic"] = topic  # the direction page it belongs to; checked below
             predecessor = original.get("supersedes", old.get("supersedes", ""))
             reason = original.get("revision_reason", old.get("revision_reason", ""))
             if predecessor:
@@ -435,6 +467,11 @@ class ResearchMemory:
                     raise ValueError("claim succession cannot contain a cycle")
                 seen.add(current)
                 current = combined.get(current, {}).get("supersedes", "")
+        topic_updates = self._validate_topics(data.get("topics") or [], state, set(state["claims"]) | set(updates))
+        known_topics = set(state.get("topics", {})) | set(topic_updates)
+        for c in updates.values():
+            if c.get("topic") and c["topic"] not in known_topics:
+                c.pop("topic")  # an unknown direction is not a reference
         agenda = data.get("agenda")
         if not isinstance(agenda, dict):
             raise ValueError("missing agenda")
@@ -454,8 +491,42 @@ class ResearchMemory:
                       + "\n\nDraft interpretation (subject to the corrections above): " + agenda["what_changed"]}
         if self.cfg.research.enabled:
             agenda = {**agenda, "next_experiments": []}  # plans live in NEXT.md / DECISION.md
-        return {"claims": updates, "agenda": {k: agenda[k] for k in (
+        return {"claims": updates, "topics": topic_updates, "agenda": {k: agenda[k] for k in (
             "motivation", "method", "what_changed", "open_questions", "next_experiments")}}
+
+    @staticmethod
+    def _validate_topics(topics, state, known_claims) -> dict:
+        """Direction pages (L1): one per research direction. Earlier claim references and explored nodes are
+        retained; a reference to an unknown claim is dropped rather than invented."""
+        if not isinstance(topics, list) or len(topics) > 8:
+            raise ValueError("reflection exceeds 8 topic updates")
+        out = {}
+        for t in topics:
+            if not isinstance(t, dict):
+                raise ValueError("invalid topic")
+            tid = t.get("id", "")
+            if not isinstance(tid, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", tid) or tid in out:
+                raise ValueError("invalid or duplicate topic ID")
+            if t.get("status") not in ("active", "stalled", "closed"):
+                raise ValueError("invalid topic status")
+            for key, cap in (("title", 200), ("summary", 1500)):
+                if not isinstance(t.get(key), str) or not t[key].strip() or len(t[key]) > cap:
+                    raise ValueError(f"topic requires bounded {key}")
+            old = state.get("topics", {}).get(tid, {})
+            best = t.get("best") if isinstance(t.get("best"), dict) else {}
+            score = best.get("score")
+            if isinstance(score, bool) or not isinstance(score, (int, float)):
+                score = (old.get("best") or {}).get("score")
+            tried = {x for x in (t.get("tried") or []) if isinstance(x, str) and x in known_claims}
+            subtree = {str(x)[:64] for x in (t.get("subtree") or []) if isinstance(x, str)}
+            out[tid] = {"id": tid, "title": t["title"].strip(), "status": t["status"],
+                        "scope": str(t.get("scope") or old.get("scope") or "")[:1000],
+                        "summary": t["summary"].strip(), "why_stalled": str(t.get("why_stalled") or "")[:1000],
+                        "tried": sorted(tried | set(old.get("tried", []))),
+                        "best": {"node": str(best.get("node") or (old.get("best") or {}).get("node") or "")[:64],
+                                 "score": score},
+                        "subtree": sorted(subtree | set(old.get("subtree", [])))[:24], "updated_at": now_iso()}
+        return out
 
     def ledger_views(self):
         """INSIGHTS.md / DEADENDS.md as views of the wiki: supported claims and refuted ones."""
@@ -487,6 +558,21 @@ class ResearchMemory:
                 body += ["", "## Revises earlier knowledge",
                          f"[Previous claim]({c['supersedes']}.md)", c["revision_reason"]]
             atomic_write_text(dest / "wiki" / (c["id"] + ".md"), "\n".join(body) + "\n")
+        topics = state.get("topics", {})
+        if topics:
+            lines += ["", "## Research directions"]
+        for t in topics.values():
+            lines.append(f"- [{t['title']}](topics/{t['id']}.md) — {t['status']}")
+            best = t.get("best") or {}
+            best_line = ((f"node {best['node']}" + (f", official score {best['score']}" if best.get("score") is not None else ""))
+                         if best.get("node") else "(none recorded)")
+            body = [f"# {t['title']}", "", f"Status: {t['status']}", "", t["summary"], "", "## Scope",
+                    t.get("scope") or "(unstated)", "", "## Best measured result", best_line,
+                    "", "## Why it stalled", t.get("why_stalled") or "(not stalled)",
+                    "", "## Claims in this direction",
+                    *([f"- [{cid}](../wiki/{cid}.md)" for cid in t.get("tried", [])] or ["- None"]),
+                    "", "## Explored at nodes", ", ".join(t.get("subtree", [])) or "(none recorded)"]
+            atomic_write_text(dest / "topics" / (t["id"] + ".md"), "\n".join(body) + "\n")
         atomic_write_text(dest / "INDEX.md", "\n".join(lines) + "\n")
         agenda = ["# Research agenda", "", "This is a revisable synthesis, not independently verified fact."]
         for key, value in state["agenda"].items():
@@ -500,11 +586,21 @@ class ResearchMemory:
                  "claims": [{"id": c["id"], "title": c["title"], "kind": c["kind"],
                              "status": c["status"], "scope": c["scope"],
                              "page": f"../wiki/{c['id']}.md", "supports": c["supports"],
-                             "opposes": c["opposes"], "supersedes": c.get("supersedes", "")}
-                            for c in state["claims"].values()], "changes": state.get("changes", [])}
+                             "opposes": c["opposes"], "supersedes": c.get("supersedes", ""),
+                             "topic": c.get("topic", "")}
+                            for c in state["claims"].values()],
+                 "topics": [{"id": t["id"], "title": t["title"], "status": t["status"],
+                             "page": f"../topics/{t['id']}.md", "tried": t.get("tried", []),
+                             "best": t.get("best", {}), "subtree": t.get("subtree", [])}
+                            for t in state.get("topics", {}).values()],
+                 "changes": state.get("changes", [])}
         atomic_write_json(dest / "index" / "index.json", index)
         navigation = ["# Knowledge index", "", "Navigation only; follow source links to assess evidence.", "",
                       "[Research agenda](../AGENDA.md)", "[Belief revisions](../CHANGES.md)", ""]
+        if state.get("topics"):
+            navigation += ["## Directions", ""]
+            navigation += [f"- [{t['title']}](../topics/{t['id']}.md) — {t['status']}" for t in state["topics"].values()]
+            navigation.append("")
         for kind in ("observation", "hypothesis", "experience"):
             navigation += ["## " + kind.title(), ""]
             navigation += [f"- [{c['title']}](../wiki/{c['id']}.md) — {c['status']}"

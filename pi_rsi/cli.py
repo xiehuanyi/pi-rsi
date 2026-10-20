@@ -134,7 +134,8 @@ def cmd_memory(a: argparse.Namespace) -> int:
                 break
     state = memory.state()
     print(json.dumps({"enabled": memory.enabled, "path": str(memory.root), "revision": state["revision"],
-                      "claims": len(state["claims"]), "pending": len(memory.pending()) if memory.enabled else 0},
+                      "claims": len(state["claims"]), "topics": len(state.get("topics", {})),
+                      "pending": len(memory.pending()) if memory.enabled else 0},
                      ensure_ascii=False, indent=2))
     return 0
 
@@ -173,6 +174,11 @@ def cmd_research(a: argparse.Namespace) -> int:
 def cmd_monitor(a: argparse.Namespace) -> int:
     cfg = load_experiment(_exp(a.dir))
     records = []
+    if cfg.tree_path.exists():
+        from .tree import Tree
+        for n in Tree.load(cfg.tree_path).nodes.values():
+            if n.status == "waiting":  # the wake queue: tasks the controller polls without a thread or a model
+                records.append({"node": n.id, "kind": "waiting_node", **(n.worker.get("waiting") or {})})
     for path in sorted(cfg.nodes_dir.glob("*/eval/*.monitor.json")):
         record = read_json(path, {}) or {}
         # Refresh queue state without calling or waking a model.
@@ -185,6 +191,42 @@ def cmd_monitor(a: argparse.Namespace) -> int:
                 record["job_state"] = "missing"
         records.append({"node": path.parent.parent.name, "path": str(path), **record})
     print(json.dumps(records, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_job(a: argparse.Namespace) -> int:
+    """Worker side of long tasks: register a command with the task queue and end the session; the harness
+    resumes the session when the job ends. The record lives in <node dir>/jobs/<job id>.json."""
+    from . import jobs
+    from .util import atomic_write_json, now_iso
+    if a.action != "submit":
+        raise ValueError("rsi job supports: submit")
+    cmd = list(a.cmd)
+    if cmd and cmd[0] == "--":
+        cmd = cmd[1:]
+    if not cmd:
+        raise ValueError("rsi job submit needs a command after --")
+    nd = Path(a.node_dir).expanduser().resolve()
+    if not nd.is_dir():
+        raise ValueError(f"node directory not found: {nd}")
+    exp = nd.parent.parent
+    try:
+        name = load_experiment(exp).name  # GPU-hour accounting groups jobs by the experiment's name
+    except (OSError, ValueError, KeyError):
+        name = exp.name
+    owner = f"{name}/{nd.name}/worker"
+    cwd = Path.cwd()
+    result = str(Path(a.result).resolve()) if a.result else ""
+    metrics = str(Path(a.metrics).resolve()) if a.metrics else ""
+    jobs.ensure_daemon()
+    job = jobs.submit(cmd, cwd, owner=owner, gpus=a.gpus, timeout_s=a.timeout, stall_s=a.stall,
+                      metrics_path=metrics, result_path=result)
+    atomic_write_json(nd / "jobs" / f"{job.id}.json", {
+        "job": job.id, "cmd": cmd, "cwd": str(cwd), "submitted_at": now_iso(), "gpus": a.gpus,
+        "timeout_s": a.timeout, "result_path": result, "metrics_path": metrics, "label": a.label or ""})
+    print(job.id)
+    print(f"submitted {job.id}; log {jobs.jobs_dir() / 'logs' / (job.id + '.log')}. End this session now; "
+          "the harness resumes it when the job ends.", file=sys.stderr)
     return 0
 
 
@@ -488,7 +530,27 @@ def cmd_status(a: argparse.Namespace) -> int:
     for n in sorted(tree.nodes.values(), key=lambda n: (n.id != 'root', n.id)):
         print(f"  {n.id:<6} p={n.parent or '-':<5} d={n.depth} {n.status:<10} {n.verdict or '-':<10} {fmt_score(n.score):>10} "
               f"Δp={fmt_score(n.delta_parent):>8} {human_duration(n.duration_s):>7}  {n.title}")
+    _print_priorities(cfg)
     return 0
+
+
+def _print_priorities(cfg, limit=5):
+    """This round's phase and the top candidate parents with their priority decomposition."""
+    try:
+        from .orchestrator import Orchestrator
+        orch = Orchestrator(cfg, verbose=False)
+        sched = orch.scheduler
+        phase = sched.phase()
+        top = sched.ranked(phase)[:limit]
+    except Exception as e:  # a view; never hides the tree
+        print(f"(priority ranking unavailable: {e})")
+        return
+    waiting = [n.id for n in orch.tree.by_status('waiting')]
+    print(f"phase {phase}; top {len(top)} candidate parents by priority"
+          + (f"; waiting for results: {', '.join(waiting)}" if waiting else "") + ":")
+    for n, p in top:
+        print(f"  {n.id:<6} total {p['total']:>6.2f}  exploit {p['exploit']:.2f} explore {p['explore']:.2f} "
+              f"info {p['info']:.0f} novelty {p['novelty']:.2f} fail {p['fail']:.2f} explored {p['explored']}  {n.title}")
 
 
 def cmd_observe(a: argparse.Namespace) -> int:
@@ -681,6 +743,18 @@ def main(argv: list[str] | None = None) -> int:
     nt.add_argument("--timeout", type=int, default=3600)
     nt.set_defaults(fn=cmd_newtask)
 
+    jb = sub.add_parser("job", help="worker side: submit a long command to the task queue; the session is resumed when it ends")
+    jb.add_argument("action", choices=["submit"])
+    jb.add_argument("--node-dir", required=True, help="this node's notes directory (nodes/<id>), as given in the worker instructions")
+    jb.add_argument("--gpus", type=int, default=0)
+    jb.add_argument("--timeout", type=int, default=3600, help="seconds before the queue kills the job")
+    jb.add_argument("--stall", type=int, default=0, help="kill when --metrics stops growing for this long (0 = off)")
+    jb.add_argument("--metrics", help="JSONL progress file the command writes ({step, value} per line)")
+    jb.add_argument("--result", help="result file the command writes when it finishes")
+    jb.add_argument("--label", help="short description")
+    jb.add_argument("cmd", nargs="*", help="the command and its arguments, after a `--` separator (run in the current directory)")
+    jb.set_defaults(fn=cmd_job)
+
     jd = sub.add_parser("jobd", help="run the job queue daemon (GPU assignment, timeouts, early termination)")
     jd.add_argument("--gpus", default=None, help="comma-separated GPU ids (default: all visible)")
     jd.add_argument("--max-cpu-jobs", type=int, default=2)
@@ -722,7 +796,14 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--language")
     w.set_defaults(fn=cmd_write)
 
+    argv = list(sys.argv[1:] if argv is None else argv)
+    command = None
+    if argv[:1] == ["job"] and "--" in argv:  # everything after `--` is the job's own command line
+        cut = argv.index("--")
+        argv, command = argv[:cut], argv[cut + 1:]
     a = p.parse_args(argv)
+    if command is not None:
+        a.cmd = command
     return a.fn(a)
 
 

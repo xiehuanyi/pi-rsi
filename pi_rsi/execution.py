@@ -118,6 +118,8 @@ class ExecutionStore:
             if measurement.get("state") == "invalid":
                 node.status = "failed"
                 node.diagnosis = {"retry": False, "phase": "integrity"}
+            elif execution["state"] == "waiting":
+                node.status = "waiting"  # its task is queued or running; no worker thread is attached
             elif execution["state"] == "running":
                 node.status = "evaluating" if execution["phase"] == "evaluation" else "running"
             elif execution["state"] in ("failed", "interrupted"):
@@ -142,7 +144,8 @@ class ExecutionStore:
     def worker_finished(self, node, seconds):
         def update(record):
             active = next(a for a in record["attempts"] if a["id"] == record["active_attempt"])
-            active["worker_seconds"] = seconds
+            # A session resumed after a submitted job adds to the same attempt's time.
+            active["worker_seconds"] = active.get("worker_seconds", 0) + seconds
         return self.change(node, update)
 
     def begin_attempt(self, node):

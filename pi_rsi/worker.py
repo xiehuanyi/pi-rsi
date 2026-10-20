@@ -8,7 +8,7 @@ from typing import Any
 
 from . import gitops
 from . import prompts as P
-from .evaluator import run_eval, score_of, EvalError
+from .evaluator import run_eval, score_of, EvalError, queued_eval, begin_eval, eval_pending
 from .tree import Node
 from .util import (now_iso, read_json, read_text, append_text, atomic_write_json, atomic_write_text, tail_text,
                    fmt_score, now_ts, as_number)
@@ -39,6 +39,14 @@ def run_node(orch, node: Node) -> None:
     base = node.base_commit or parent.commit
     t0 = time.time()
     phase = "implementation"
+    hb = nd / "heartbeat"
+
+    def on_event(ev):
+        try:
+            hb.write_text(str(ev["t"]))
+        except OSError:
+            pass
+
     try:
         orch.executions.project(tree)
         journal = orch.executions.read(node)
@@ -46,7 +54,7 @@ def run_node(orch, node: Node) -> None:
             # Measured under another evaluation protocol: neither re-executed nor documented
             # under the new one. `rsi reeval` re-measures it.
             orch.log("stale_measurement_not_rerun", node=node.id)
-            if node.status in ("planned", "running", "evaluating", "analyzing"):
+            if node.status in ("planned", "running", "evaluating", "analyzing", "waiting"):
                 orch._park_stale(node)
             return
         if journal["measurement"].get("state") == "skipped":
@@ -68,6 +76,7 @@ def run_node(orch, node: Node) -> None:
             _finish_measurement(orch, node, metrics, nd, worktree, t0)
             return
         resume_eval = node.worker.get("resume_evaluation") and worktree.exists()
+        resume_worker = not resume_eval and node.worker.get("resume_worker") and worktree.exists()
         if resume_eval:
             from .runner import RunResult
             commit = node.commit
@@ -77,73 +86,86 @@ def run_node(orch, node: Node) -> None:
             budget = node.worker.get("research", {}).get("tuning_budget", {})
             orch.log("monitor_wait_resume", node=node.id)
         else:
-            if node.worker.get("resume_implementation") and worktree.exists():
-                # Same hypothesis, a new execution attempt. Preserve all previous
-                # notes and Git commits instead of allocating another tree node.
-                archive = nd / "attempts" / f"a{node.attempt - 1:03d}"
-                archive.mkdir(parents=True, exist_ok=True)
-                for name in ("HANDOFF.md", "IMPLEMENTATION.md", "PROGRESS.md", "FAILURE.md", "TUNING.jsonl", "proposals.json"):
-                    source = nd / name
-                    if source.exists() and not (archive / name).exists():
-                        (archive / name).write_bytes(source.read_bytes())
+            if resume_worker:
+                # The session ended on purpose after `rsi job submit`; its jobs have finished.
+                res, attempt_dir = _resume_after_jobs(orch, node, nd, worktree, on_event)
             else:
-                gitops.add_worktree(cfg.repo_dir, worktree, branch, base)
-            record = orch.executions.begin_attempt(node)
-            attempt = record["attempts"][-1]
-            from .orchestrator import link_task_dirs
-            link_task_dirs(cfg, worktree)
-            tree.update(node, status="running", attempt=attempt["ordinal"], started_at=now_iso(), branch=branch, base_commit=base,
-                        worker={**node.worker, "kind": cfg.runner.kind, "model": cfg.runner.model, "effort": cfg.runner.effort})
-            atomic_write_text(nd / "HYPOTHESIS.md", f"# {node.title}\n\n{node.hypothesis}\n\n"
-                              f"type: {node.kind}\nparent: {node.parent}\nbase commit: {base}\n")
-            orch.log("node_start", node=node.id, parent=node.parent, title=node.title, base=gitops.short(base))
-            orch.render()
+                if node.worker.get("resume_implementation") and worktree.exists():
+                    # Same hypothesis, a new execution attempt. Preserve all previous
+                    # notes and Git commits instead of allocating another tree node.
+                    archive = nd / "attempts" / f"a{node.attempt - 1:03d}"
+                    archive.mkdir(parents=True, exist_ok=True)
+                    for name in ("HANDOFF.md", "IMPLEMENTATION.md", "PROGRESS.md", "FAILURE.md", "TUNING.jsonl", "proposals.json"):
+                        source = nd / name
+                        if source.exists() and not (archive / name).exists():
+                            (archive / name).write_bytes(source.read_bytes())
+                else:
+                    gitops.add_worktree(cfg.repo_dir, worktree, branch, base)
+                record = orch.executions.begin_attempt(node)
+                attempt = record["attempts"][-1]
+                from .orchestrator import link_task_dirs
+                link_task_dirs(cfg, worktree)
+                tree.update(node, status="running", attempt=attempt["ordinal"], started_at=now_iso(), branch=branch, base_commit=base,
+                            worker={**node.worker, "kind": cfg.runner.kind, "model": cfg.runner.model, "effort": cfg.runner.effort,
+                                    "job_rounds": 0})
+                atomic_write_text(nd / "HYPOTHESIS.md", f"# {node.title}\n\n{node.hypothesis}\n\n"
+                                  f"type: {node.kind}\nparent: {node.parent}\nbase commit: {base}\n")
+                orch.log("node_start", node=node.id, parent=node.parent, title=node.title, base=gitops.short(base))
+                orch.render()
 
-            # 1. worker session --------------------------------------------------
-            if cfg.memory.enabled:
-                try:
-                    info = orch.memory.snapshot(node)
-                except (OSError, ValueError, KeyError) as e:
-                    orch.log("memory_failed", node=node.id, error=str(e))
-                    info = {"revision": "", "error": str(e)}
-                    atomic_write_text(nd / "MEMORY.md", "Research memory unavailable; use original experiment evidence.")
-                tree.update(node, worker={**node.worker, "memory": info})
-            prompt = P.worker_prompt(cfg, tree, node, worktree)
-            hb = nd / "heartbeat"
-
-            def on_event(ev):
-                try:
-                    hb.write_text(str(ev["t"]))
-                except OSError:
-                    pass
-
-            budget = node.worker.get("research", {}).get("tuning_budget", {})
-            total_seconds = budget.get("seconds", cfg.runner.node_timeout_s)
-            timeout = min(cfg.runner.node_timeout_s, total_seconds - orch.executions.worker_seconds(node))
-            if timeout <= 0:
-                raise NodeFailure("implementation budget exhausted for this hypothesis")
-            attempt_dir = nd / "attempts" / attempt["id"]
-            attempt_dir.mkdir(parents=True, exist_ok=True)
-            res = orch.worker_runner.run_agent(prompt, cwd=worktree, log_path=attempt_dir / "runner.jsonl", max_turns=cfg.runner.max_turns,
-                                               timeout_s=timeout, idle_timeout_s=cfg.runner.idle_timeout_s,
-                                               on_event=on_event)
+                # 1. worker session --------------------------------------------------
+                if cfg.memory.enabled:
+                    try:
+                        info = orch.memory.snapshot(node)
+                    except (OSError, ValueError, KeyError) as e:
+                        orch.log("memory_failed", node=node.id, error=str(e))
+                        info = {"revision": "", "error": str(e)}
+                        atomic_write_text(nd / "MEMORY.md", "Research memory unavailable; use original experiment evidence.")
+                    tree.update(node, worker={**node.worker, "memory": info})
+                prompt = P.worker_prompt(cfg, tree, node, worktree)
+                budget = node.worker.get("research", {}).get("tuning_budget", {})
+                total_seconds = budget.get("seconds", cfg.runner.node_timeout_s)
+                timeout = min(cfg.runner.node_timeout_s, total_seconds - orch.executions.worker_seconds(node))
+                if timeout <= 0:
+                    raise NodeFailure("implementation budget exhausted for this hypothesis")
+                attempt_dir = nd / "attempts" / attempt["id"]
+                attempt_dir.mkdir(parents=True, exist_ok=True)
+                res = orch.worker_runner.run_agent(prompt, cwd=worktree, log_path=attempt_dir / "runner.jsonl", max_turns=cfg.runner.max_turns,
+                                                   timeout_s=timeout, idle_timeout_s=cfg.runner.idle_timeout_s,
+                                                   on_event=on_event)
             orch.add_cost("worker", res)
             orch.executions.worker_finished(node, res.duration_s)
             orch.log("worker_end", node=node.id, ok=res.ok, error=res.error, duration_s=round(res.duration_s, 1),
                      turns=res.num_turns, tool_calls=res.tool_calls, cost_usd=res.cost_usd, session=res.session_id)
             usage = dict(res.usage)
             cost = res.cost_usd
-            worker_info = {**node.worker, "session_id": res.session_id, "runner_ok": res.ok, "runner_error": res.error,
-                           "turns": res.num_turns, "tool_calls": res.tool_calls, "privacy_flag": _privacy_flag(nd / "runner.jsonl")}
+            worker_info = {**node.worker, "session_id": res.session_id or node.worker.get("session_id"), "runner_ok": res.ok,
+                           "runner_error": res.error, "turns": res.num_turns, "tool_calls": res.tool_calls}
             # Latest-run log is a compatibility view; attempt logs remain permanent.
-            (nd / "runner.jsonl").write_bytes((attempt_dir / "runner.jsonl").read_bytes())
-            if (attempt_dir / "runner.prompt.md").exists():
-                (nd / "runner.prompt.md").write_bytes((attempt_dir / "runner.prompt.md").read_bytes())
-            worker_info["privacy_flag"] = _privacy_flag(attempt_dir / "runner.jsonl")
+            log = Path(getattr(res, "log_path", "") or attempt_dir / "runner.jsonl")
+            if log.exists():
+                (nd / "runner.jsonl").write_bytes(log.read_bytes())
+            prompt_copy = log.with_name(log.stem + ".prompt.md")
+            if prompt_copy.exists():
+                (nd / "runner.prompt.md").write_bytes(prompt_copy.read_bytes())
+            worker_info["privacy_flag"] = _privacy_flag(log)
 
             # 2. commit whatever is there ---------------------------------------
             commit = gitops.commit_all(worktree, f"rsi: end of node {node.id} (auto-commit)") or gitops.head(worktree)
             tree.update(node, commit=commit, usage=usage, cost_usd=cost, worker=worker_info)
+
+            # 2b. jobs the worker handed to the queue (`rsi job submit`): wait for them without this thread ----
+            pending = worker_jobs(nd, pending_only=True)
+            if pending:
+                rounds = node.worker.get("job_rounds", 0) + 1
+                if rounds > cfg.runner.max_job_rounds:
+                    raise NodeFailure(f"the worker submitted jobs in {rounds} rounds; the cap is {cfg.runner.max_job_rounds}")
+                orch.executions.execution_phase(node, "implementation", state="waiting")
+                tree.update(node, status="waiting", worker={**node.worker, "resume_worker": True, "job_rounds": rounds,
+                            "waiting": {"kind": "worker_job", "since": now_iso(), "jobs": [j["job"] for j in pending]}})
+                orch.log("worker_job_wait", node=node.id, jobs=[j["job"] for j in pending], rounds=rounds)
+                orch.render()
+                return  # the controller's wake queue resumes this session when the jobs end
 
             # 3. handoff rescue --------------------------------------------------
             notes = nd / notes_file(cfg)
@@ -190,12 +212,22 @@ def run_node(orch, node: Node) -> None:
         orch.executions.execution_phase(node, phase)
         tree.update(node, status="evaluating")
         orch.render()
-        best_now = tree.best()
-        incumbent = None
-        if cfg.task.job_enabled and best_now is not None:
-            incumbent = cfg.nodes_dir / best_now.id / "eval" / f"run.{cfg.task.official_seedset}" / "metrics.jsonl"
+        incumbent = _incumbent(orch)
         protocol = evaluation_protocol(cfg)
         try:
+            if queued_eval(cfg):
+                # Submit and let go of this thread: the controller's wake queue resumes the node when the task
+                # ends. A restarted controller re-attaches to the same job (same code, command and protocol).
+                pending = begin_eval(cfg, worktree, cfg.task.official_seedset, nd / "eval", owner=f"{cfg.name}/{node.id}",
+                                     incumbent_path=incumbent, resume=bool(resume_eval))
+                if pending:
+                    orch.executions.execution_phase(node, phase, state="waiting")
+                    tree.update(node, status="waiting", worker={**node.worker, "resume_evaluation": True,
+                                "waiting": {"kind": "evaluation", "since": now_iso()}})
+                    orch.log("eval_submitted", node=node.id, seedset=cfg.task.official_seedset)
+                    orch.render()
+                    return
+                resume_eval = True  # the task has already ended: collect its result
             # A restarted controller continues the persisted evaluation (same job, same attempt).
             metrics = run_eval(cfg, worktree, cfg.task.official_seedset, nd / "eval", owner=f"{cfg.name}/{node.id}",
                                incumbent_path=incumbent, resume=bool(resume_eval))
@@ -223,7 +255,7 @@ def run_node(orch, node: Node) -> None:
             tree.update(node, score=score, measurement=measurement, delta_best=delta_best,
                         metrics={k: v for k, v in metrics.items() if k != "per_seed"},
                     quick_score=quick_score, proposals=proposals, delta_parent=delta_parent,
-                    worker={**node.worker, "evaluation_validated": marker},
+                    worker={**node.worker, "evaluation_validated": marker, "waiting": None},
                     proposals_revision=node.worker.get("memory", {}).get("revision", ""))
         orch.log("eval_done", node=node.id, score=score, delta_parent=delta_parent,
                  elapsed_s=metrics.get("_eval", {}).get("elapsed_s"))
@@ -242,6 +274,74 @@ def run_node(orch, node: Node) -> None:
     finally:
         orch.render()
 
+
+def _incumbent(orch):
+    """Curve of the best node so far, for early termination of a queued training run."""
+    cfg, tree = orch.cfg, orch.tree
+    best_now = tree.best()
+    if cfg.task.job_enabled and best_now is not None:
+        return cfg.nodes_dir / best_now.id / "eval" / f"run.{cfg.task.official_seedset}" / "metrics.jsonl"
+    return None
+
+
+def eval_pending_for(orch, node):
+    """Poll a waiting node's official evaluation (see evaluator.eval_pending); no model is called."""
+    cfg = orch.cfg
+    return eval_pending(cfg, cfg.worktrees_dir / node.id, cfg.task.official_seedset, cfg.nodes_dir / node.id / "eval",
+                        owner=f"{cfg.name}/{node.id}", incumbent_path=_incumbent(orch))
+
+
+def worker_jobs(nd: Path, pending_only: bool = False) -> list[dict]:
+    """Jobs the worker registered with `rsi job submit` (nodes/<id>/jobs/*.json), with their queue state."""
+    from . import jobs
+    out = []
+    for path in sorted((nd / "jobs").glob("*.json")) if (nd / "jobs").is_dir() else []:
+        record = read_json(path, {}) or {}
+        try:
+            job = jobs.Job.load(record["job"])
+            state = {"status": job.status, "reason": job.reason, "duration_s": job.duration_s, "exit_code": job.exit_code,
+                     "log": str(jobs.jobs_dir() / "logs" / f"{job.id}.log")}
+        except (KeyError, FileNotFoundError):
+            state = {"status": "missing", "reason": "job record not found in the queue"}
+        if pending_only and state["status"] not in ("queued", "running"):
+            continue
+        out.append({**record, **state})
+    return out
+
+
+def worker_jobs_pending(nd: Path) -> bool:
+    pending = worker_jobs(nd, pending_only=True)
+    if pending:
+        from . import jobs
+        jobs.ensure_daemon()  # a poll keeps the queue alive exactly as a blocking wait would
+    return bool(pending)
+
+
+def _resume_after_jobs(orch, node, nd, worktree, on_event):
+    """Wake the worker's own session once the jobs it submitted have ended, with a bounded budget."""
+    cfg, tree = orch.cfg, orch.tree
+    session_id = node.worker.get("session_id")
+    if not session_id or not hasattr(orch.worker_runner, "resume_agent"):
+        raise NodeFailure("the worker submitted jobs but its session cannot be resumed")
+    finished = worker_jobs(nd)
+    orch.executions.execution_phase(node, "implementation")
+    tree.update(node, status="running", worker={**node.worker, "resume_worker": False, "waiting": None})
+    record = orch.executions.read(node)
+    attempt_dir = nd / "attempts" / (record.get("active_attempt") or f"a{node.attempt:03d}")
+    attempt_dir.mkdir(parents=True, exist_ok=True)
+    budget = node.worker.get("research", {}).get("tuning_budget", {})
+    total_seconds = budget.get("seconds", cfg.runner.node_timeout_s)
+    remaining = total_seconds - orch.executions.worker_seconds(node)
+    timeout = max(cfg.runner.resume_min_s, min(cfg.runner.resume_timeout_s, remaining))
+    round_no = node.worker.get("job_rounds", 1)
+    prompt = P.worker_resume_prompt(cfg, node, finished, timeout)
+    orch.log("worker_resume", node=node.id, jobs=[j.get("job") for j in finished],
+             statuses=[j.get("status") for j in finished], timeout_s=timeout, round=round_no)
+    res = orch.worker_runner.resume_agent(session_id, prompt, cwd=worktree,
+                                          log_path=attempt_dir / f"runner.resume{round_no}.jsonl",
+                                          max_turns=cfg.runner.max_turns, timeout_s=timeout,
+                                          idle_timeout_s=cfg.runner.idle_timeout_s, on_event=on_event)
+    return res, attempt_dir
 
 def _delivery(orch, node, nd, worktree, base):
     """Record what the worker says it delivered (DELIVERY.json). A component the worker switched off is
@@ -471,7 +571,8 @@ def _fail(orch, node: Node, failure: str, nd: Path, worktree: Path, t0: float, *
         orch.executions.execution_phase(node, phase, state="failed", error=failure)
     tree.update(node, status="failed", failure=failure, diagnosis=diagnosis, finished_at=now_iso(),
                 duration_s=round(time.time() - t0, 1), verdict="failed",
-                summary=f"FAILED: {failure[:160]} — {diagnosis.get('cause', '')[:200]}")
+                summary=f"FAILED: {failure[:160]} — {diagnosis.get('cause', '')[:200]}",
+                worker={**node.worker, "resume_evaluation": False, "resume_worker": False, "waiting": None})
     atomic_write_text(nd / "FAILURE.md", f"# Failure {node.id}\n\n{failure}\n\n## Diagnosis\n{json.dumps(diagnosis, indent=1)}\n")
     orch.log("node_failed", node=node.id, failure=failure, retry=diagnosis.get("retry"), cause=diagnosis.get("cause"))
     if not diagnosis.get("retry"):  # a retry reuses this worktree and may reuse its caches

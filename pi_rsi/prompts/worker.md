@@ -32,6 +32,8 @@ data for inner tuning, keep the best measured configuration, and explain the sel
 # Context from earlier nodes
 ## Path from root
 $path_block
+## Compressed path summary (what the ancestors' analyses concluded; read it before the parent record)
+$path_summary
 $context_block
 
 # Rules
@@ -42,5 +44,7 @@ $context_block
 5. Keep the code modular and readable: $code_rules No file over 400 lines. Prefer small pure functions and explicit constants over magic numbers.
 6. Determinism: the evaluator seeds the environment. Keep the agent deterministic (no unseeded randomness) so scores reproduce.
 7. Append to `$node_dir/PROGRESS.md` as you go: what you tried, exact numbers with their seed set, errors seen, what you learned. Write it before each evaluation run and after reading the result.
-8. Do not attempt network access and do not spawn background jobs that outlive this session.
+8. Do not attempt network access and do not spawn background jobs that outlive this session, with one exception: a command expected to run longer than about $long_minutes minutes (a long training run, a full-data fit) must be handed to the task queue instead of run in the shell:
+   `$rsi_bin job submit --node-dir $node_dir [--gpus N] [--timeout SECONDS] [--result FILE] -- <command and arguments>`
+   It runs in this worktree, with these files, when the queue schedules it; the job id is printed and its log path is shown. After submitting, note what is pending in `$node_dir/PROGRESS.md`, commit, and END this session. The harness resumes this same session when the job ends, so you can read its outputs and finish. At most $max_job_rounds such rounds per node.
 $deliverables

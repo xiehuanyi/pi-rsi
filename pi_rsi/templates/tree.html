@@ -123,7 +123,7 @@ h1#title { font-size: 1.28rem; font-weight: 650; letter-spacing: -.02em; margin:
 }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--plan); }
 #run-status[data-status="running"]::before, .chip.running::before { background: var(--run); }
-#run-status[data-status="evaluating"]::before { background: var(--eval); }
+#run-status[data-status="evaluating"]::before, #run-status[data-status="waiting"]::before { background: var(--eval); }
 #run-status[data-status="done"]::before, #run-status[data-status="finished"]::before { background: var(--ok); }
 #run-status[data-status="failed"]::before { background: var(--bad); }
 #run-status[data-status="planned"]::before { background: var(--plan); }
@@ -475,6 +475,7 @@ tr.active-row:hover td { background: var(--accent-soft); }
           <option value="planned">Planned</option>
           <option value="running">Running</option>
           <option value="evaluating">Evaluating</option>
+          <option value="waiting">Waiting for a task</option>
           <option value="incomplete">Notes pending</option>
           <option value="done">Done</option>
           <option value="failed">Failed</option>
