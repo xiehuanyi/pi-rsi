@@ -1,0 +1,21 @@
+{
+  "snapshot_at_utc": "2026-10-04T17:47:53+00:00",
+  "run_state_at_snapshot": {
+    "status": "running",
+    "stop_reason": null,
+    "experiment": "airline-s6e10-sol61-2080ti-20261004"
+  },
+  "nodes_allocated": 19,
+  "node_limit": 32,
+  "completed": 16,
+  "failed": 2,
+  "active": 1,
+  "baseline_auc": 0.9572004065863107,
+  "best_node": "n016",
+  "best_auc": 0.9579240131255401,
+  "delta_from_baseline": 0.0007236065392294266,
+  "wiki_claims": 55,
+  "wiki_pending": 0,
+  "final_holdout_evaluated": false,
+  "interpretation": "Adaptive search-validation evidence; repeatability and independent confirmation remain unestablished."
+}

@@ -1,0 +1,16 @@
+/* Frame for pages migrated from blog.pocketplay.win; page styles come from the original stylesheets. */
+:root{--rsi-bar-bg:#f6f4ef;--rsi-bar-fg:#2b2a27;--rsi-bar-line:#e3dfd6;--rsi-bar-link:#3b5bdb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rsi-bar-bg:#1b1c20;--rsi-bar-fg:#e7e5df;--rsi-bar-line:#2e3036;--rsi-bar-link:#8ea5ff}}
+html[data-rsi-legacy]{--rsi-bar-bg:#fafafa;--rsi-bar-fg:#22252a;--rsi-bar-line:#e8e9ec;--rsi-bar-link:#285ea5}
+.rsi-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:10px 16px;background:var(--rsi-bar-bg);color:var(--rsi-bar-fg);border-bottom:1px solid var(--rsi-bar-line);
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.rsi-bar a{color:var(--rsi-bar-link);text-decoration:none}
+.rsi-bar a:hover{text-decoration:underline}
+.rsi-bar .rsi-links{display:flex;gap:16px}
+.rsi-home{font-weight:600;color:var(--rsi-bar-fg)!important}
+.rsi-foot{border-top:1px solid var(--rsi-bar-line);border-bottom:0;margin-top:48px;font-size:13px}
+.rsi-index{max-width:760px;margin:0 auto;padding:32px 16px;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--rsi-bar-fg)}
+.rsi-index h1{font-size:28px;margin:0 0 8px}.rsi-index h2{font-size:18px;margin:32px 0 8px}
+.rsi-index a{color:var(--rsi-bar-link)}.rsi-index ul{padding-left:20px}.rsi-index li{margin:6px 0}
+.rsi-index .lede{color:inherit;opacity:.8}

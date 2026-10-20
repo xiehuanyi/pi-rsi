@@ -1,0 +1,17 @@
+# Dead ends (do not retry; each line cites the node)
+
+- HasGarage and HasBsmt added no LightGBM split gain on a full-public-train fit (redundant with GarageArea/TotalBsmtSF); kept but not valuable without an ablation. [n001]
+- RidgeCV alphas 1–100: GCV always chose the upper bound 100 on the wide feature matrix; not usable without widening the grid. [n002]
+- ElasticNetCV vs Ridge on the same quick folds: delta 0.0016 ≪ fold std 0.024, so switching models was not justified. [n002]
+- Equal-weight LGBM+XGB+CatBoost log blend with no feature or weight changes: official 0.13889 vs parent 0.1418 (|Δ|=0.00291 < 0.04203) — not a meaningful holdout win despite worker quick −0.00641. [n004]
+- Bundle of Ames extras + Edwards/cheap GrLivArea>4000 train drop: official score 0.14524 vs parent 0.1389 (no meaningful gain). [n005]
+- QualGrLiv/extras do not rescue cheap-palace predictions (worker: Id 1299 still ~3.4× high on quick fold 4). [n005]
+- Equal 1/4 log-space blend with un-robustified Ridge: official Δ −0.0020 vs parent 0.1389 is within |δ|<0.04451; worker’s quick Δ −0.00157 ≪ fold std. [n006]
+- LGBM extras (TotalBath/TotalPorchSF/QualArea) plus Edwards train drop: official 0.14766 vs parent 0.1418 (no meaningful improvement; same directional failure mode as n005). [n007]
+- Global OOF NNLS simplex weights on the un-robustified 4-member log blend: worker quick 0.12070 vs 0.11896 (Δ +0.00174, fold 4 +0.00830); official validation flat at 0.13676 vs 0.1369. [n009]
+- Cap named areas at 4000 (or max(4000,p99)) without BsmtFinSF1 consistency: worker ridge-only fold 4 ~0.168, Id 1299 still ~1.08e6. [n008]
+- Drop-only, no caps: ridge mean improves but fold 4 stays 0.16959 and Id 1299 stays ~1.12e6 (n005-style holdout risk). [n008]
+- 99th on the four named columns without BsmtFinSF1 clip: fold-4 ridge 0.16405, Id 1299 still ~996k. [n008]
+- Global living-4000 + LotArea/GarageArea p99 only: worker in-process mean 0.12905, fold 4 0.16874, Id 1299 still ~6.85×. [n010]
+- Global p99 on listed area cols: worker in-process fold 4 ~0.163 with Id 1183 ratio ~0.35 (luxury flattened). [n010]
+- Cheap-palace train drop: no fold-4 change when Id 1299 is already held out. [n010]

@@ -1,0 +1,22 @@
+
+  #pi-rsi-oct04 { position:relative; }
+  #pi-rsi-oct04 > h2 { padding-right:96px; }
+  #pi-rsi-oct04 > h3 { margin-top:18px; margin-bottom:8px; }
+  #pi-rsi-oct04 .rsi-chart { width:100%; }
+  #pi-rsi-oct04 .rsi-plot { display:block; width:100%; }
+  #pi-rsi-oct04 .rsi-plot text { fill:var(--foreground); font-size:12px; font-weight:400; }
+  #pi-rsi-oct04 .rsi-plot .axis path, #pi-rsi-oct04 .rsi-plot .axis line { stroke:var(--border); }
+  #pi-rsi-oct04 .rsi-legend { gap:16px; margin-top:4px; }
+  #pi-rsi-oct04 .rsi-legend button { display:inline-flex; align-items:center; gap:6px; padding:0; border:0; background:transparent; color:var(--foreground); font:inherit; }
+  #pi-rsi-oct04 .rsi-swatch { display:inline-block; width:16px; height:3px; }
+  #pi-rsi-oct04 .rsi-tree { position:relative; width:100%; }
+  #pi-rsi-oct04 .rsi-branches { display:block; width:100%; }
+  #pi-rsi-oct04 .rsi-node { position:absolute; transform:translate(-50%,-50%); }
+  #pi-rsi-oct04 .rsi-mobile-row { display:flex; align-items:center; gap:8px; min-height:44px; }
+  #pi-rsi-oct04 .rsi-mobile-row .rsi-parent { color:var(--muted-foreground); }
+  #pi-rsi-oct04 #rsi-detail { display:grid; gap:5px; }
+  #pi-rsi-oct04 #rsi-tooltip { position:absolute; pointer-events:none; z-index:5; color:var(--popover-foreground); background:var(--popover); }
+  #pi-rsi-oct04 .rsi-detail-title { font-weight:500; }
+
+.rsi-series-0{background:var(--viz-series-1)}
+.rsi-series-1{background:var(--viz-series-2)}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN" data-rsi-legacy>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grok46-vs-grok45 · Research notes</title>
+<meta name="description" content="grok-4.6 与 grok-4.5（high）在同一 kag 农场任务上的 RSI 实验对比：baseline 均为 3,587，grok-4.5 验证集最佳 37,329、held-out 35,748，grok-4.6 为 24,614 和 24,926。附各节点策略、得分、耗时与 token 用量。">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/analysis/grok46-vs-grok45/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/style.css">
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main"><div class="breadcrumbs" aria-label="当前位置"><a href="https://blog.pocketplay.win/">Research notebook</a><span>/</span><a href="/pi-rsi/rsi/">RSI</a><span>/</span><a href="/pi-rsi/rsi/analysis/">分析记录</a><span>/</span><a href="/pi-rsi/rsi/analysis/grok46-vs-grok45/">grok46-vs-grok45</a></div><article><h1>grok46-vs-grok45</h1>
+<p><a href="/pi-rsi/rsi/compare/grok46-vs-grok45/">打开交互式对比页</a></p>
+<table>
+<thead>
+<tr>
+<th>实验</th>
+<th>worker</th>
+<th>baseline</th>
+<th>最佳（validation）</th>
+<th>最佳（held-out）</th>
+<th>节点 完成/失败</th>
+<th>停止</th>
+<th>总耗时</th>
+<th>token 输入/输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="/pi-rsi/rsi/experiments/kag-grok-46/">kag-grok-46</a></td>
+<td>grok:grok-4.6:high</td>
+<td>3,587</td>
+<td>24,614 (n008)</td>
+<td>24,926</td>
+<td>10/0</td>
+<td>max_nodes</td>
+<td>1h49m</td>
+<td>3,989,018/591,613</td>
+</tr>
+<tr>
+<td><a href="/pi-rsi/rsi/experiments/kag-grok-45/">kag-grok-45</a></td>
+<td>grok:grok-4.5:high</td>
+<td>3,587</td>
+<td>37,329 (n008)</td>
+<td>35,748</td>
+<td>8/0</td>
+<td>patience</td>
+<td>1h00m</td>
+<td>2,151,072/254,942</td>
+</tr>
+</tbody></table>
+<h3>kag-grok-46 节点顺序</h3>
+<ul>
+<li><code>n002</code> done 16,217（best so far 16,217，20m31s）：Early daily HIRE to multiply plant/water throughput</li>
+<li><code>n001</code> done 9,525（best so far 16,217，21m48s）：Multi-tile wheat farm with daily water/harvest route</li>
+<li><code>n003</code> done 22,269（best so far 22,269，17m41s）：Buy NE land and scale wheat</li>
+<li><code>n004</code> done 20,736（best so far 22,269，20m42s）：Fertilize wheat bonus window</li>
+<li><code>n005</code> done 23,598（best so far 23,598，27m27s）：Fertilize wheat bonus window</li>
+<li><code>n006</code> done 21,683（best so far 23,598，26m38s）：Compact spawn-aware 5x10 regions</li>
+<li><code>n007</code> done 24,088（best so far 24,088，21m22s）：Defer goose CARE on harvest days</li>
+<li><code>n008</code> done 24,614（best so far 24,614，19m29s）：Compact spawn-aware NW+NE regions</li>
+<li><code>n009</code> done 22,086（best so far 24,614，8m50s）：Skip late DROP while tiles need water</li>
+<li><code>n010</code> done 24,575（best so far 24,614，20m32s）：Fertilize wheat bonus window</li>
+</ul>
+<h3>kag-grok-45 节点顺序</h3>
+<ul>
+<li><code>n002</code> done 9,085（best so far 9,085，13m17s）：Cheap daily hired hands for parallel farm ops</li>
+<li><code>n001</code> done 8,177（best so far 9,085，19m01s）：Multi-tile wheat field with daily route</li>
+<li><code>n004</code> done 36,892（best so far 36,892，12m04s）：Parallel melon (or melon+carrot) loop</li>
+<li><code>n003</code> done 8,229（best so far 36,892，28m25s）：Buy NE land, extend hand farm</li>
+<li><code>n005</code> done 36,584（best so far 36,892，11m50s）：Buy NE land under melon tile cap</li>
+<li><code>n007</code> done 36,405（best so far 36,892，6m08s）：More hands after NE unlock</li>
+<li><code>n006</code> done 36,892（best so far 36,892，7m36s）：Fertilize melons for age-8 max yield</li>
+<li><code>n008</code> done 37,329（best so far 37,329，10m13s）：Quadrant-local hand partition</li>
+</ul>
+</article><footer><div class="friend-label">友情链接</div><div class="friend-links"><a href="https://cats.pocketplay.win/" target="_blank" rel="noopener noreferrer">五只小猫一场戏</a> <a href="https://pocketplay.win/play/sheepdog-meadow/" target="_blank" rel="noopener noreferrer">无能的小狗</a> <a href="https://pocketplay.win/play/lily-hop/" target="_blank" rel="noopener noreferrer">大蛤蟆</a> <a href="https://pocketplay.win/" target="_blank" rel="noopener noreferrer">PocketPlay</a></div></footer></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>最初发表于 PocketPlay 博客，现托管在 GitHub Pages。</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

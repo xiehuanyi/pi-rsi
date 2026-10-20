@@ -1,0 +1,21 @@
+
+  #pi-rsi-wiki-oct04 { position:relative; }
+  #pi-rsi-wiki-oct04 h2 { padding-right:94px; }
+  #pi-rsi-wiki-oct04 h3 { margin-top:16px; margin-bottom:8px; }
+  #pi-rsi-wiki-oct04 .wk-select { display:grid; gap:5px; margin:14px 0; }
+  #pi-rsi-wiki-oct04 #wk-claim-detail { display:grid; gap:8px; }
+  #pi-rsi-wiki-oct04 .wk-title { font-weight:500; }
+  #pi-rsi-wiki-oct04 .wk-graph { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 108px minmax(0,1fr); gap:30px; align-items:center; padding:8px 0; }
+  #pi-rsi-wiki-oct04 #wk-edges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #pi-rsi-wiki-oct04 .wk-support, #pi-rsi-wiki-oct04 .wk-oppose, #pi-rsi-wiki-oct04 .wk-center { position:relative; }
+  #pi-rsi-wiki-oct04 .wk-sources { display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
+  #pi-rsi-wiki-oct04 .wk-evidence-detail { display:grid; gap:5px; margin:12px 0; overflow-wrap:anywhere; }
+  #pi-rsi-wiki-oct04 .wk-fold { margin-top:14px; }
+  #pi-rsi-wiki-oct04 .wk-fold summary { font-weight:500; }
+  #pi-rsi-wiki-oct04 .wk-fold[open] > :not(summary) { margin-top:10px; }
+  #pi-rsi-wiki-oct04 .wk-section { display:grid; gap:6px; margin-top:10px; }
+  #pi-rsi-wiki-oct04 .wk-version-change { display:grid; gap:5px; margin-top:12px; }
+  @media(max-width:520px) {
+    #pi-rsi-wiki-oct04 .wk-graph { grid-template-columns:1fr; gap:26px; }
+    #pi-rsi-wiki-oct04 .wk-center { justify-self:center; }
+  }

@@ -125,6 +125,7 @@ def node_docs(cfg: ExperimentCfg, n: Node) -> dict[str, str]:
         "thinking": read_text(think) if think and think.is_relative_to((cfg.dir / "cycles").resolve()) else "",
         "analysis": read_text(nd / "analysis.json"),
         "next": read_text(nd / "NEXT.md"),
+        "implementation": read_text(nd / "IMPLEMENTATION.md"),
     }
 
 

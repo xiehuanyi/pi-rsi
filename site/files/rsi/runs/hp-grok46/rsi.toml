@@ -1,0 +1,49 @@
+[experiment]
+name = "hp-grok46"
+notes = "House Prices, worker grok-4.6 xhigh, utility grok-4.5 low; hidden holdout official, kaggle LB final"
+
+[task]
+name = "kaggle-house-prices"
+dir = "~/pi-rsi/tasks/kaggle-house-prices"
+brief = "TASK.md"
+docs = ["docs/data_description.txt"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --python {python} --quiet"
+worker_eval_command = "{python} eval/eval.py --seedset {seedset} --python {python}"
+worker_val_command = ""
+final_eval_root = false
+seedsets = ["quick", "validation", "kaggle"]
+official_seedset = "validation"
+final_seedset = "kaggle"
+quick_seedset = "quick"
+eval_timeout_s = 2400
+higher_is_better = false
+score_key = "score"
+reference_scores = {solid_public_lb = 0.12}
+
+[runner]
+kind = "grok"
+model = "grok-4.6"
+effort = "xhigh"
+max_turns = 80
+node_timeout_s = 1500
+idle_timeout_s = 480
+extra_args = []
+
+[utility]
+kind = "grok"
+model = "grok-4.5"
+effort = "low"
+timeout_s = 600
+
+[search]
+width_root = 3
+width = 2
+depth = 4
+max_nodes = 10
+max_parallel = 2
+patience = 4
+max_retries = 1
+root_eval = true

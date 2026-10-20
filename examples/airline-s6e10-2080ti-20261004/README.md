@@ -8,7 +8,7 @@ This example records a real, sequential search on the supplied S6E10 airline-sat
 
 ## View the experiment
 
-The interactive pages are also published on the blog: [overview](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/), [full search tree](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/tree/), and [research Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/en/wiki/). The [English guide](https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/) has the [Chinese version](https://blog.pocketplay.win/zh/blog/pi-rsi-airline-20261004/).
+The interactive pages are also published on the blog: [overview](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/en/), [full search tree](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/en/tree/), and [research Wiki](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/en/wiki/). The [English guide](https://xiehuanyi.github.io/pi-rsi/en/blog/pi-rsi-airline-20261004/) has the [Chinese version](https://xiehuanyi.github.io/pi-rsi/zh/blog/pi-rsi-airline-20261004/).
 
 Download or clone this repository and open `index.html` in a browser. It contains the chart, search branches and node details, including D3, and works offline. Click a node to select it; toggle the legend to show or hide the score series. The expanded `tree.html` also works offline and includes hypotheses, handoffs, analyses, audited results, failure records and research knowledge. GitHub's file view displays the HTML source; it does not run the interactive page.
 

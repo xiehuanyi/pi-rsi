@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" data-pp-site="blog">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The full search tree · pi-rsi</title>
+<meta name="description" content="The full search tree · pi-rsi: View the airline experiment search tree and follow connections between recorded runs and their scores.">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/en/tree/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/kit/v2/pp.css">
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/airline-20261004/assets/viz.css">
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/airline-20261004/assets/tree.css">
+<script src="/pi-rsi/rsi/interactive/airline-20261004/assets/tree-data.js" defer></script>
+<script src="/pi-rsi/rsi/interactive/airline-20261004/assets/state.js" defer></script>
+<script src="/pi-rsi/rsi/interactive/airline-20261004/assets/tree.js" defer></script>
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/airline-20261004/assets/guide.css">
+<script src="/pi-rsi/rsi/interactive/airline-20261004/assets/guide.js" defer></script>
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="pp pp-v2 rsi-site">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/">pi-rsi</a><span class="rsi-links"><a href="/pi-rsi/rsi/interactive/airline-20261004/zh/tree/" hreflang="zh">中文</a><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main" class="pp-main"><header class="pp-container pp-pagehead rsi-hero rsi-hero--compact">
+  <nav class="pp-crumbs"><a href="/pi-rsi/rsi/interactive/airline-20261004/en/">Inside an autonomous research run</a></nav>
+  <p class="pp-kicker">Research log · pi-rsi</p>
+  <h1 class="rsi-hero__title">The full search tree</h1>
+  <p class="rsi-hero__lede">Every hypothesis in the run, with its code ancestry, official score, audit and handoff notes, as the harness recorded them.</p>
+</header>
+<section class="pp-container pp-section--tight"><nav class="pp-chips rsi-tabs"><a class="pp-chip" href="/pi-rsi/rsi/interactive/airline-20261004/en/">Experiment overview</a><a class="pp-chip" href="/pi-rsi/rsi/interactive/airline-20261004/en/tree/" aria-current="page">Full search tree</a><a class="pp-chip" href="/pi-rsi/rsi/interactive/airline-20261004/en/wiki/">Research Wiki</a></nav><div class="rsi-viz"><div class="rsi-article">
+<div class="rsi-prose">
+  <p>This is pi-rsi’s own explorer for the airline run. It holds far more detail than the <a href="/pi-rsi/rsi/interactive/airline-20261004/en/">overview</a>, which is the better place to start if you want the story first. Below is a short guide to the six panels, then a few nodes worth opening.</p>
+  <h2 id="read">How to read this page</h2>
+</div>
+
+<ol class="rsi-panels">
+  <li><b>Summary strip</b><span>Baseline and best official scores, hypotheses allocated against the 32-node limit, execution attempts including retries, and an estimate of model-API spend. GPU time is not included.</span></li>
+  <li><b>Search tree</b><span>Drag to pan, scroll or use +/− to zoom, and press <em>Best</em> to jump to the top node. Each card shows the official score and the gain over its parent. Card colour is the auditor’s verdict; the gold path is the best node’s ancestry and the dashed path is the selected node’s.</span></li>
+  <li><b>Inspector</b><span>The selected node in depth. <em>Overview</em> has the hypothesis, observed result, recorded code changes and the auditor’s claim check. <em>Handoff</em> is what the worker left for the next agent. <em>Result analysis</em>, <em>Progress</em> and <em>Evidence</em> hold the analyst’s reading, the worker’s running log and the linked Wiki evidence.</span></li>
+  <li><b>Score curve</b><span>The same best-so-far curve as the overview. Switch to <em>By time</em> to see wall-clock pacing, including idle gaps. Crosses mark failed nodes.</span></li>
+  <li><b>Research knowledge</b><span><em>Insights</em> and <em>Dead ends</em> are ledgers in which every line cites the node that produced it. <em>Wiki &amp; revisions</em> shows the Wiki at the revision pinned to this snapshot.</span></li>
+  <li><b>Node ledger</b><span>One row per node: verdict, official score, gain over its parent (green up, red down), elapsed time and parent. Search or filter by status, and click an id to select that node everywhere on the page.</span></li>
+</ol>
+
+<div class="rsi-prose">
+  <aside class="rsi-callout">
+    <h3>Why does almost every node say “no change”?</h3>
+    <p>The auditor labels a node <em>improved</em> only when its gain over its parent exceeds a noise threshold. This evaluator reports a single AUC without per-row uncertainty, so the harness falls back to a deliberately conservative default of 1% of the baseline score, about 0.0096 AUC. No single step in this run comes close. Read “no change” as “not distinguishable under the default rule,” and use the <em>Gain vs parent</em> column together with the agent’s +0.0002 practical bar for finer judgement.</p>
+  </aside>
+
+  <h3>Good places to start</h3>
+  <ul class="rsi-starts">
+    <li><button type="button" class="rsi-jump" data-jump-node="n016">n016 ★</button><span>The best node. Open its <em>Handoff</em> tab to see how the worker described its own below-threshold result.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n008">n008</button><span>The largest single step, depth 8 with L2&nbsp;=&nbsp;10, and the parent of six follow-up hypotheses.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n017">n017</button><span>A fresh control that reproduced n014’s score in every recorded digit.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n001">n001</button><span>A voided measurement: the model file changed after it was scored.</span></li>
+    <li><button type="button" class="rsi-jump" data-jump-node="n012">n012</button><span>A crash with a recorded diagnosis. Its repaired follow-up is n013.</span></li>
+  </ul>
+</div>
+
+<div class="rsi-native">
+<a class="skip" href="#treewrap">Skip to search tree</a>
+<header class="topbar">
+  <div class="brand">
+
+    <h2 id="title"></h2>
+    <p class="sub" id="subtitle"></p>
+  </div>
+  <div class="header-actions">
+    <span id="run-status" class="chip" title="This page is a rendered snapshot">Snapshot</span>
+    <button type="button" class="icon-btn" id="theme-toggle" aria-label="Toggle color theme" title="Toggle color theme">
+      <svg class="icon-moon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.2 1.4a6.4 6.4 0 0 0 8 8.8 6.6 6.6 0 1 1-8-8.8z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 3.2a.8.8 0 0 1-.8-.8V1.2a.8.8 0 1 1 1.6 0v1.2a.8.8 0 0 1-.8.8zm0 9.6a.8.8 0 0 1 .8.8v1.2a.8.8 0 1 1-1.6 0v-1.2a.8.8 0 0 1 .8-.8zM3.2 8a.8.8 0 0 1-.8.8H1.2a.8.8 0 1 1 0-1.6h1.2a.8.8 0 0 1 .8.8zm11.6.8h-1.2a.8.8 0 1 1 0-1.6h1.2a.8.8 0 1 1 0 1.6zM4.1 4.1a.8.8 0 0 1-1.13 0l-.85-.85a.8.8 0 1 1 1.13-1.13l.85.85a.8.8 0 0 1 0 1.13zm9.78 9.78a.8.8 0 0 1-1.13 0l-.85-.85a.8.8 0 1 1 1.13-1.13l.85.85a.8.8 0 0 1 0 1.13zM4.1 11.9a.8.8 0 0 1 0 1.13l-.85.85a.8.8 0 1 1-1.13-1.13l.85-.85a.8.8 0 0 1 1.13 0zm8.65-8.65.85-.85A.8.8 0 1 1 14.73 3.5l-.85.85a.8.8 0 0 1-1.13-1.13zM8 5.2A2.8 2.8 0 1 1 8 10.8 2.8 2.8 0 0 1 8 5.2z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="page">
+  <div class="workspace">
+    <section class="panel tree-panel" aria-labelledby="tree-heading">
+      <div class="panel-head">
+        <h2 id="tree-heading">Search tree</h2>
+        <div class="toolbar" role="toolbar" aria-label="Tree view">
+          <button type="button" class="icon-btn" id="zoom-in" aria-label="Zoom in" title="Zoom in">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 3a.75.75 0 0 1 .75.75v3.5h3.5a.75.75 0 0 1 0 1.5h-3.5v3.5a.75.75 0 0 1-1.5 0v-3.5h-3.5a.75.75 0 0 1 0-1.5h3.5v-3.5A.75.75 0 0 1 8 3z"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="zoom-out" aria-label="Zoom out" title="Zoom out">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3.25 8a.75.75 0 0 1 .75-.75h8a.75.75 0 0 1 0 1.5h-8A.75.75 0 0 1 3.25 8z"/></svg>
+          </button>
+          <span id="zoom-label">100%</span>
+          <button type="button" class="icon-btn" id="fit-tree" aria-label="Fit tree" title="Fit tree">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2.5 2.5h3v1.5h-1.5v1.5H2.5zm8 0h3v3h-1.5V4H10.5zM2.5 10.5H4v1.5h1.5v1.5h-3zm9 1.5V10.5h1.5v3h-3V12.5zM5.5 5.5h5v5h-5z"/></svg>
+            <span class="lbl">Fit</span>
+          </button>
+          <button type="button" class="icon-btn" id="focus-best" aria-label="Focus best score path" title="Focus best score path">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6 9.7 5.4l4.1.4-3.1 2.8.9 4-3.6-2.1-3.6 2.1.9-4L2.2 5.8l4.1-.4z"/></svg>
+            <span class="lbl">Best</span>
+          </button>
+        </div>
+      </div>
+      <div id="treewrap">
+        <svg id="tree" role="group" aria-label="Research search tree"></svg>
+      </div>
+      <div class="legend" aria-label="Legend">
+        <div class="group">
+          <span class="leg path-best"><i></i>Best score path</span>
+          <span class="leg path-anc"><i></i>Selected ancestry</span>
+        </div>
+        <span class="sep" aria-hidden="true"></span>
+        <div class="group">
+          <span class="leg st-improved"><i></i>Improved</span>
+          <span class="leg st-same"><i></i>No change</span>
+          <span class="leg st-worse"><i></i>Worse</span>
+          <span class="leg st-failed"><i></i>Failed</span>
+          <span class="leg st-running"><i></i>Running</span>
+          <span class="leg st-planned"><i></i>Planned</span>
+          <span class="leg st-abandoned"><i></i>Abandoned</span>
+        </div>
+      </div>
+      <p id="tree-help">Drag to pan · scroll to zoom · click a node to inspect. This is a snapshot, not a live view. </p>
+    </section>
+
+    <aside class="panel inspector" aria-labelledby="node-heading">
+      <div class="panel-head">
+        <h2 id="node-heading">Node</h2>
+      </div>
+      <div id="detail" class="empty">Select a node in the tree or ledger.</div>
+    </aside>
+  </div>
+
+  <div class="lower">
+    <section class="panel" aria-labelledby="chart-heading">
+      <div class="panel-head">
+        <h2 id="chart-heading">Score curve</h2>
+        <div id="chart-controls" role="group" aria-label="Curve axis">
+          <button type="button" data-axis="nodes" class="on">By node</button>
+          <button type="button" data-axis="time">By time</button>
+        </div>
+      </div>
+      <svg id="chart" width="100%" height="260" role="group" aria-label="Score curve"></svg>
+      <p id="chart-note" class="muted">Finished nodes only. Axis is a snapshot of recorded scores.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="notes-heading">
+      <div class="panel-head">
+        <h2 id="notes-heading">Research knowledge</h2>
+        <div class="tabs" role="tablist" aria-label="Notes">
+          <button type="button" class="on" data-t="insights">Insights</button>
+          <button type="button" data-t="deadends">Dead ends</button>
+          <button type="button" data-t="wiki">Wiki &amp; revisions</button>
+          <button type="button" data-t="monitor_notes">Task monitor</button>
+        </div>
+      </div>
+      <pre id="idtext"></pre>
+    </section>
+  </div>
+
+  <section class="panel ledger" aria-labelledby="ledger-heading">
+    <div class="panel-head">
+      <h2 id="ledger-heading">Node ledger</h2>
+      <div class="filters">
+        <input type="search" id="node-search" placeholder="Search nodes" aria-label="Search nodes">
+        <select id="status-filter" aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="planned">Planned</option>
+          <option value="running">Running</option>
+          <option value="evaluating">Evaluating</option>
+          <option value="incomplete">Notes pending</option>
+          <option value="done">Done</option>
+          <option value="failed">Failed</option>
+          <option value="abandoned">Abandoned</option>
+        </select>
+      </div>
+    </div>
+    <div class="tablewrap"><table id="table"></table></div>
+  </section>
+</div>
+
+
+</div>
+</div></div><details class="rsi-method"><summary>Snapshot and interpretation</summary><p>Archived data; the page does not poll the running experiment. Search-validation scores and Wiki statuses are not independent confirmation. Original experimental records remain in their source language.</p><a href="/pi-rsi/rsi/interactive/airline-20261004/summary.json">Experiment metadata</a> · <a href="/pi-rsi/rsi/interactive/airline-20261004/wiki-data.json">Wiki metadata</a> · <a href="/pi-rsi/rsi/interactive/airline-20261004/protocol.md">Frozen protocol</a></details></section></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>First published on the PocketPlay blog; now hosted on GitHub Pages.</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

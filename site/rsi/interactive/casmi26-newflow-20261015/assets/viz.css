@@ -1,0 +1,44 @@
+.casmi-viz { max-width:960px; margin:24px auto; color:var(--ink); }
+.casmi-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:0 0 20px; }
+.casmi-kpi { background:var(--bg-2); border-radius:var(--r-m); padding:14px 16px; }
+.casmi-kpi__label { font-size:13px; color:var(--ink-3); }
+.casmi-kpi__value { font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; }
+.casmi-kpi__note { font-size:12px; color:var(--ink-3); }
+.casmi-block { position:relative; margin:8px 0 28px; }
+.casmi-block h2 { font-family:var(--font-sans); font-size:20px; font-weight:600; margin:0 0 6px; }
+.casmi-legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; color:var(--ink-3); margin:0 0 8px; padding:0; list-style:none; }
+.casmi-legend li { display:flex; align-items:center; gap:6px; }
+.casmi-sw { width:12px; height:10px; border-radius:3px; display:inline-block; }
+.casmi-scroll { overflow-x:auto; }
+.casmi-svg { width:100%; height:auto; display:block; }
+.casmi-map { min-width:620px; }
+.casmi-grid line { stroke:var(--line); }
+.casmi-axis text { fill:var(--ink-3); font-size:11px; }
+.casmi-best { fill:none; stroke:var(--ink-3); stroke-width:2; stroke-dasharray:5 4; }
+.casmi-mark { stroke:var(--ink-4); stroke-dasharray:3 3; }
+.casmi-mark-label { fill:var(--ink-2); font-size:11px; }
+.casmi-pt { cursor:pointer; stroke:var(--bg); stroke-width:1; }
+.casmi-link { fill:none; stroke:var(--line-2); stroke-width:1.2; }
+.casmi-link.is-path { stroke:#378add; stroke-width:2.5; }
+.casmi-node { cursor:pointer; }
+.casmi-node rect { stroke-width:.6; }
+.casmi-node.is-path rect { stroke-width:1.6; }
+.casmi-node text { font-family:var(--font-mono, ui-monospace, monospace); font-size:11px; fill:#26215c; pointer-events:none; }
+.casmi-c-best, .casmi-sw.casmi-c-best { fill:#2a78d6; background:#2a78d6; }
+.casmi-c-same, .casmi-sw.casmi-c-same { fill:#eb6834; background:#eb6834; }
+.casmi-c-chg, .casmi-sw.casmi-c-chg { fill:#1baf7a; background:#1baf7a; }
+.casmi-c-fail, .casmi-sw.casmi-c-fail { fill:#e34948; background:#e34948; }
+.casmi-c-run, .casmi-sw.casmi-c-run { fill:#eda100; background:#eda100; }
+.casmi-node.casmi-c-best rect { fill:#e6f1fb; stroke:#185fa5; }
+.casmi-node.casmi-c-same rect { fill:#faece7; stroke:#993c1d; }
+.casmi-node.casmi-c-chg rect { fill:#e1f5ee; stroke:#0f6e56; }
+.casmi-node.casmi-c-fail rect { fill:#fcebeb; stroke:#a32d2d; }
+.casmi-node.casmi-c-run rect { fill:#faeeda; stroke:#854f0b; }
+.casmi-node.casmi-c-root rect { fill:#f1efe8; stroke:#5f5e5a; }
+.casmi-star { fill:#ef9f27; stroke:#854f0b; stroke-width:.8; }
+.casmi-tip { position:absolute; z-index:5; max-width:320px; padding:10px 12px; border:1px solid var(--line-2); border-radius:var(--r-s); background:var(--surface); color:var(--ink-2); box-shadow:var(--shadow-1); font-size:12px; line-height:1.5; pointer-events:none; opacity:0; transition:opacity .12s; }
+.casmi-tip.is-on { opacity:1; }
+.casmi-tip__title { color:var(--ink); font-weight:600; font-size:13px; margin-bottom:2px; }
+.casmi-tip__meta { font-variant-numeric:tabular-nums; margin-bottom:4px; }
+.casmi-method { margin:8px auto 28px; max-width:960px; }
+@media (pointer:coarse) { .casmi-legend li { min-height:28px; } }

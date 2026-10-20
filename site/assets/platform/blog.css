@@ -1,0 +1,77 @@
+/* PocketPlay Blog (every host: list, article, method). Kit v2 tokens only. */
+/* Shim: kit `.pp a { color: inherit }` (0,1,1) outranks `.pp-btn` (0,1,0), so anchor buttons lose their colour. Remove once pp.css is fixed. */
+.pp a.pp-btn { color: var(--accent-ink); }
+.pp a.pp-btn--ink { color: var(--bg); }
+.pp a.pp-btn--secondary { color: var(--ink); }
+.pp a.pp-btn--ghost { color: var(--ink-2); }
+.pp a.pp-btn--ghost:hover { color: var(--ink); }
+.pp a.pp-btn--soft { color: var(--accent-text); }
+.pp a.pp-link { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 3px; }
+.pp a.pp-link:hover { text-decoration-color: currentColor; }
+.pp a.pp-chip:not([aria-current]):not(.is-active) { color: var(--ink-2); }
+.pp a.pp-chip:not([aria-current]):not(.is-active):hover { color: var(--ink); }
+
+/* List page head */
+.bg-head { padding-top: 56px; gap: 14px; }
+.bg-head__row { display: flex; align-items: center; gap: 18px; }
+.bg-head__row .pp-title { margin-top: 6px; }
+.bg-head .pp-lede { max-width: 60ch; }
+.bg-filter { margin-top: 28px; }
+.bg-feature { margin-top: 28px; }
+.pp-container.bg-filter + .bg-feature { margin-top: 22px; }
+.bg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.bg-links { gap: 6px; }
+.bg-empty__actions { justify-content: center; }
+.pp-empty.pp-card { padding: 56px 24px; }
+
+/* Community band */
+.bg-band { grid-template-columns: minmax(0, 1fr) auto; }
+.bg-band__text { display: flex; align-items: center; gap: 16px; }
+
+/* Article layout: reading column + sticky rail */
+.bg-wrap { padding-top: 40px; }
+.bg-layout { display: grid; grid-template-columns: minmax(0, 700px) 300px; justify-content: center; gap: 64px; align-items: start; }
+.bg-header { display: grid; gap: 14px; margin-bottom: 36px; }
+.bg-title { font-size: clamp(30px, 4vw, 42px); line-height: 1.14; letter-spacing: -.03em; text-wrap: balance; }
+:lang(zh) .bg-title { line-height: 1.28; letter-spacing: -.02em; }
+.bg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13.5px; color: var(--ink-3); }
+.bg-header .pp-lede { font-size: clamp(17px, 1.6vw, 19.5px); max-width: none; }
+.bg-prose { padding-top: 12px; border-top: 1px solid var(--line); }
+.bg-prose > :first-child { margin-top: 1.4em; }
+.bg-prose .table-scroll { overflow-x: auto; }
+.bg-sources { margin-top: 56px; display: grid; gap: 14px; }
+.bg-sources h2 { font-size: 20px; }
+.bg-sources .pp-listrow { padding: 14px 18px; }
+.bg-sources .pp-listrow h3 { font-size: 15px; }
+.bg-sources .pp-listrow > .pp-i { color: var(--ink-4); }
+.bg-foot { margin-top: 22px; }
+.bg-rail { padding-top: 6px; }
+.bg-cta { display: grid; gap: 18px; }
+.bg-cta__head { display: flex; align-items: center; gap: 14px; }
+.bg-cta__head h2 { font-size: 19px; }
+.bg-cta .pp-btn { justify-content: space-between; text-align: left; white-space: normal; height: auto; min-height: 42px; padding-top: 10px; padding-bottom: 10px; }
+.bg-cta__ask { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 550; color: var(--ink-2); }
+.bg-cta__ask:hover { color: var(--accent-text); }
+.bg-cta__ask .pp-i { width: 15px; height: 15px; }
+
+/* Method page */
+.bg-principles { display: grid; gap: 12px; margin-top: 8px; }
+.bg-principle { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 16px; padding: 20px 22px; }
+.bg-principle h2 { font-size: 17px; }
+.bg-principle p { margin-top: 4px; color: var(--ink-2); font-size: 15px; }
+.bg-wrap .bg-links { margin-top: 28px; }
+
+@media (max-width: 1080px) {
+  .bg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bg-layout { grid-template-columns: minmax(0, 700px); gap: 40px; }
+  .bg-rail { position: static; max-width: 700px; }
+}
+@media (max-width: 640px) {
+  .bg-grid { grid-template-columns: 1fr; }
+  .bg-head { padding-top: 36px; }
+  .bg-wrap { padding-top: 24px; }
+  .bg-band { grid-template-columns: 1fr; }
+  .bg-band__text { align-items: flex-start; }
+  .bg-band .pp-btn { justify-self: start; }
+  .bg-principle { padding: 16px; gap: 14px; }
+}

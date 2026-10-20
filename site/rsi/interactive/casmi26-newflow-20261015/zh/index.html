@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN" data-pp-site="blog">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pi-rsi · CASMI26 的 proxy 偏差与修正</title>
+<meta name="description" content="CASMI26 实验各节点的官方分数、搜索树、纠偏与提示词修正的位置。">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/interactive/casmi26-newflow-20261015/zh/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/kit/v2/pp.css">
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/assets/viz.css?v=0826f5da21">
+<script src="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/assets/d3.min.js?v=f2094bbf61" defer></script>
+<script src="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/assets/data.js?v=5bd9373434" defer></script>
+<script src="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/assets/app.js?v=9cb2c82d8c" defer></script>
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="pp pp-v2 rsi-site">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/en/" hreflang="en">English</a><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main" class="pp-main"><header class="pp-container pp-pagehead"><nav class="pp-crumbs"><a href="/pi-rsi/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/">文章</a></nav><h1 class="pp-title">pi-rsi 在 CASMI26：有偏的 proxy 与修正</h1><p class="pp-lede">每个节点的官方分数、搜索树，以及两次纠偏和提示词修正发生的位置。悬停或点按节点查看摘要。</p></header><section class="pp-container pp-section--tight"><div class="casmi-viz"><div class="casmi-kpis"><div class="casmi-kpi"><div class="casmi-kpi__label">最佳官方 MRR@25</div><div class="casmi-kpi__value">0.4185</div><div class="casmi-kpi__note">基线 0.3071</div></div><div class="casmi-kpi"><div class="casmi-kpi__label">输出与父节点相同</div><div class="casmi-kpi__value">22 / 31</div><div class="casmi-kpi__note">已评测节点</div></div><div class="casmi-kpi"><div class="casmi-kpi__label">提示词修正后的 n034</div><div class="casmi-kpi__value">+0.0146</div><div class="casmi-kpi__note">噪声带 0.0089</div></div><div class="casmi-kpi"><div class="casmi-kpi__label">n007 的 Kaggle 公榜</div><div class="casmi-kpi__value">0.228</div><div class="casmi-kpi__note">本地 0.3998：本地分数只是 proxy</div></div></div><div class="casmi-block"><h2>各节点分数</h2><ul class="casmi-legend"><li><span class="casmi-sw casmi-c-best"></span>新最佳</li><li><span class="casmi-sw casmi-c-chg"></span>有变化但未提升</li><li><span class="casmi-sw casmi-c-same"></span>输出与父节点相同</li><li><span class="casmi-sw casmi-c-fail"></span>失败</li><li><span class="casmi-sw casmi-c-run"></span>运行中</li></ul><div id="casmi-chart"></div></div><div class="casmi-block"><h2>搜索树</h2><ul class="casmi-legend"><li><span class="casmi-sw casmi-c-best"></span>新最佳</li><li><span class="casmi-sw casmi-c-chg"></span>有变化但未提升</li><li><span class="casmi-sw casmi-c-same"></span>输出与父节点相同</li><li><span class="casmi-sw casmi-c-fail"></span>失败</li><li><span class="casmi-sw casmi-c-run"></span>运行中</li></ul><p class="casmi-kpi__note">蓝色连线通向当前最佳节点（星标）。</p><div class="casmi-scroll"><div id="casmi-tree"></div></div></div></div><details class="casmi-method"><summary>快照与解释边界</summary><p>快照时间 2026-10-15T19:28+00:00（UTC）；页面不会读取正在运行的实验。分数是 449 个保留分子上的本地官方验证分数，在搜索中被反复使用，不是排行榜成绩。节点标题和摘要保留原始记录的语言。</p><p><a href="/pi-rsi/zh/blog/pi-rsi-casmi26-proxy-alignment-20261015/">文章</a> · <a href="https://github.com/xiehuanyi/pi-rsi">GitHub 上的 pi-rsi</a> · <a href="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/summary.json">快照数据</a> · <a href="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/proxy.md">proxy 台账</a> · <a href="/pi-rsi/rsi/interactive/casmi26-newflow-20261015/assets/D3-LICENSE.txt">D3 license</a></p></details></section></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>最初发表于 PocketPlay 博客，现托管在 GitHub Pages。</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

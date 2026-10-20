@@ -8,7 +8,7 @@
 
 ## 打开可视化
 
-也可直接访问博客上的[实验概览](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://blog.pocketplay.win/rsi/interactive/airline-20261004/zh/wiki/)；配套有[中文文章](https://blog.pocketplay.win/zh/blog/pi-rsi-airline-20261004/)和[英文版本](https://blog.pocketplay.win/en/blog/pi-rsi-airline-20261004/)。
+也可直接访问博客上的[实验概览](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/zh/)、[完整搜索树](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/zh/tree/)、[研究 Wiki](https://xiehuanyi.github.io/pi-rsi/rsi/interactive/airline-20261004/zh/wiki/)；配套有[中文文章](https://xiehuanyi.github.io/pi-rsi/zh/blog/pi-rsi-airline-20261004/)和[英文版本](https://xiehuanyi.github.io/pi-rsi/en/blog/pi-rsi-airline-20261004/)。
 
 下载或克隆仓库后，用浏览器直接打开 `index.html`。分数曲线、搜索分支、节点详情和 D3 均已包含在页面内，可以离线使用。点击节点查看详情，点击图例显示或隐藏分数系列。`tree.html` 是完整浏览器，包含假设、交接文档、结果分析、审计、失败记录和研究知识，同样可以离线打开。GitHub 文件页显示的是 HTML 源码，不会执行交互页面。
 

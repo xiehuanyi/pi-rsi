@@ -1,0 +1,47 @@
+[experiment]
+name = "kag-grok-45"
+notes = "model comparison: same budget, worker=grok-4.5, utility=grok-4.5 low"
+
+[task]
+name = "kaggriculture"
+dir = "~/pi-rsi/tasks/kaggriculture"
+brief = "TASK.md"
+docs = ["docs/GETTING_STARTED.md", "docs/RULES.md", "docs/kaggriculture.spec.json"]
+starter_dir = "starter"
+eval_dir = "eval"
+python = ".venv/bin/python"
+eval_command = "{python} {task_dir}/eval/eval.py --agent-dir {worktree} --seedset {seedset} --out {out} --quiet"
+worker_eval_command = "{python} eval/eval.py --seedset {seedset}"
+seedsets = ["quick", "validation", "test"]
+official_seedset = "validation"
+final_seedset = "test"
+quick_seedset = "quick"
+eval_timeout_s = 1200
+higher_is_better = true
+score_key = "score"
+reference_scores = {user_v45_tape = 138283.0}
+
+[runner]
+kind = "grok"
+model = "grok-4.5"
+effort = "high"
+max_turns = 80
+node_timeout_s = 1800
+idle_timeout_s = 480
+extra_args = []
+
+[utility]
+kind = "grok"
+model = "grok-4.5"
+effort = "low"
+timeout_s = 600
+
+[search]
+width_root = 3
+width = 2
+depth = 4
+max_nodes = 10
+max_parallel = 2
+patience = 4
+max_retries = 1
+root_eval = true

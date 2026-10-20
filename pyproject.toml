@@ -20,7 +20,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/xiehuanyi/pi-rsi"
-Notes = "https://blog.pocketplay.win/rsi/"
+Notes = "https://xiehuanyi.github.io/pi-rsi/"
 
 [project.scripts]
 rsi = "pi_rsi.cli:main"

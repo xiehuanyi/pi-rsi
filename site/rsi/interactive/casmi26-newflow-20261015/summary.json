@@ -1,0 +1,328 @@
+{
+ "experiment": "casmi26-newflow-20261012",
+ "snapshot_utc": "2026-10-15T19:28+00:00",
+ "metric": "MRR@25 (local official validation, 449 molecules)",
+ "baseline": 0.3071,
+ "best": "n034",
+ "best_score": 0.4185,
+ "identical": 22,
+ "measured": 31,
+ "marks": [
+  {
+   "after": "n022",
+   "label": [
+    "course correction k001",
+    "纠偏 k001"
+   ]
+  },
+  {
+   "after": "n030",
+   "label": [
+    "course correction k002",
+    "纠偏 k002"
+   ]
+  },
+  {
+   "after": "n032",
+   "label": [
+    "playbook fix",
+    "提示词修正"
+   ]
+  }
+ ],
+ "kaggle_public_lb": {
+  "node": "n007",
+  "value": 0.228,
+  "local": 0.3998
+ },
+ "nodes": [
+  {
+   "id": "root",
+   "parent": null,
+   "score": 0.3071,
+   "delta": null,
+   "cat": "root",
+   "title": "baseline"
+  },
+  {
+   "id": "n001",
+   "parent": "root",
+   "score": 0.3518,
+   "delta": 0.0447,
+   "cat": "best",
+   "title": "Blend a spectrum-to-fingerprint neural ranker with library matching"
+  },
+  {
+   "id": "n002",
+   "parent": "n001",
+   "score": 0.3783,
+   "delta": 0.0266,
+   "cat": "best",
+   "title": "Candidate-aware mass-hard-negative contrastive ranking"
+  },
+  {
+   "id": "n003",
+   "parent": "n002",
+   "score": 0.3832,
+   "delta": 0.0048,
+   "cat": "best",
+   "title": "Disagreement-Aware Library Promotion"
+  },
+  {
+   "id": "n004",
+   "parent": "n003",
+   "score": null,
+   "delta": null,
+   "cat": "fail",
+   "title": "Complementary exact-mass peak encoder"
+  },
+  {
+   "id": "n005",
+   "parent": "n003",
+   "score": 0.3957,
+   "delta": 0.0126,
+   "cat": "best",
+   "title": "Recover complementary peak ranker with exact-mass scoring"
+  },
+  {
+   "id": "n006",
+   "parent": "n005",
+   "score": 0.3959,
+   "delta": 0.0002,
+   "cat": "chg",
+   "title": "Three-view disagreement release for absolute promotions"
+  },
+  {
+   "id": "n007",
+   "parent": "n006",
+   "score": 0.3998,
+   "delta": 0.0039,
+   "cat": "chg",
+   "title": "Fragment-only library verification"
+  },
+  {
+   "id": "n008",
+   "parent": "n007",
+   "score": 0.3998,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Add a complementary atom-pair and torsion ranker"
+  },
+  {
+   "id": "n009",
+   "parent": "n007",
+   "score": 0.3998,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Forward Molecular-Graph Spectrum Scorer"
+  },
+  {
+   "id": "n010",
+   "parent": "n009",
+   "score": 0.3997,
+   "delta": -0.0001,
+   "cat": "chg",
+   "title": "Provenance-slot-preserving forward reranking"
+  },
+  {
+   "id": "n011",
+   "parent": "n007",
+   "score": 0.3998,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Fine-tune ranker with full-database hard negatives"
+  },
+  {
+   "id": "n012",
+   "parent": "n011",
+   "score": 0.3998,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Acquisition-Conditioned Exact-Mass Peak Ranker"
+  },
+  {
+   "id": "n013",
+   "parent": "n007",
+   "score": 0.3998,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Candidate-specific exact-mass fragmentation-feasibility ranker"
+  },
+  {
+   "id": "n014",
+   "parent": "n007",
+   "score": 0.4039,
+   "delta": 0.0041,
+   "cat": "best",
+   "title": "Generate Local Graph Edits for Class-3 Coverage"
+  },
+  {
+   "id": "n015",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Protected interleaving of generated structures"
+  },
+  {
+   "id": "n016",
+   "parent": "n015",
+   "score": null,
+   "delta": null,
+   "cat": "fail",
+   "title": "Train a joint generated-versus-database score calibrator"
+  },
+  {
+   "id": "n017",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Adduct-aware fragment-entropy library ranker"
+  },
+  {
+   "id": "n018",
+   "parent": "n017",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Training-only expected-rank-gain router for entropy replacement"
+  },
+  {
+   "id": "n019",
+   "parent": "n014",
+   "score": null,
+   "delta": null,
+   "cat": "fail",
+   "title": "Fragment-formula-aware inverse spectrum ranker"
+  },
+  {
+   "id": "n020",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Conditioned SELFIES Decoder for Broader Structure Generation"
+  },
+  {
+   "id": "n021",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Formula-directed attachment-compatible fragment grafting"
+  },
+  {
+   "id": "n022",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Train a molecule-level candidate-conditioned spectrum-set ranker"
+  },
+  {
+   "id": "n023",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Challenge-set comparison of evidence arbitration and learned representation"
+  },
+  {
+   "id": "n024",
+   "parent": "n023",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Fragment-confidence-gated deletion of legacy library bonuses"
+  },
+  {
+   "id": "n025",
+   "parent": "n023",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "COCONUT-key-balanced contrastive scorer adaptation"
+  },
+  {
+   "id": "n026",
+   "parent": "n025",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Test an inverse spectrum–molecular-graph contrastive replacement view"
+  },
+  {
+   "id": "n027",
+   "parent": "n025",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Train Morgan contrastive model with COCONUT-balanced sampling"
+  },
+  {
+   "id": "n028",
+   "parent": "n027",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Shrink NP-specialist contrastive view with target-aligned qualification"
+  },
+  {
+   "id": "n029",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Position-Aware Admission of Graph-Edit Proposals"
+  },
+  {
+   "id": "n030",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Adapt peak encoder with cross-acquisition consistency"
+  },
+  {
+   "id": "n031",
+   "parent": "n023",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Diagnose paired public-TOF versus Orbitrap ranking"
+  },
+  {
+   "id": "n032",
+   "parent": "n014",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Qualify Completed-Population Graph-Generation Headroom"
+  },
+  {
+   "id": "n033",
+   "parent": "n032",
+   "score": 0.4039,
+   "delta": 0.0,
+   "cat": "same",
+   "title": "Fixed multi-view preselection over raw graph products"
+  },
+  {
+   "id": "n034",
+   "parent": "n031",
+   "score": 0.4185,
+   "delta": 0.0146,
+   "cat": "best",
+   "title": "Supervised Query–Reference Identity Verifier"
+  },
+  {
+   "id": "n035",
+   "parent": "n034",
+   "score": null,
+   "delta": null,
+   "cat": "run",
+   "title": "Align verifier training population with exposure and query curation"
+  }
+ ]
+}

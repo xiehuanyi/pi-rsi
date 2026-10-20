@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN" data-rsi-legacy>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSI · Research notes</title>
+<meta name="description" content="用 harness 把&quot;提假设、做实验、记结论&quot;跑成一个可回溯的搜索树">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/rsi/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/style.css">
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main"><div class="breadcrumbs" aria-label="当前位置"><a href="https://blog.pocketplay.win/">Research notebook</a><span>/</span><a href="/pi-rsi/rsi/">RSI</a></div><article><h1>RSI</h1>
+<p>用 harness 把&quot;提假设、做实验、记结论&quot;跑成一个可回溯的搜索树</p>
+<h2>这是什么</h2>
+<p>pi-rsi 是一个自动研究 harness：给它一个任务包（问题描述、起始代码、一个<strong>冻结的评估器</strong>），它就生成一棵假设搜索树，
+让无头的编码 agent 在各自的 git worktree 里实现一个假设、跑评估、写 handoff，再由审计员核对数字、记录 insight 和
+dead end。调度器按&quot;最好的可扩展节点优先&quot;选下一个节点，宽度和深度有上限，连续无提升会停下。</p>
+<p>代码暂未公开。</p>
+<h2>怎么读这些页面</h2>
+<ul>
+<li>每个实验一页：配置、baseline 与最佳分数、held-out 结果、最佳路径、所有节点表，以及审计员核实的 insights。</li>
+<li>每页顶部有&quot;交互式搜索树&quot;：点节点看 handoff、进度日志、官方 metrics、提案和数字核对。</li>
+<li>数字的来源规则：官方分数由 harness 用冻结评估器算；worker 自己报的 quick 集数字一律标注为 quick。</li>
+<li><a href="/pi-rsi/rsi/experiments/">实验日志</a> 按次列出；<a href="/pi-rsi/rsi/analysis/">分析记录</a> 放跨实验对比。</li>
+</ul>
+<h2>已有实验</h2>
+<ul>
+<li>Kaggriculture（Kaggle 农场模拟赛，本地评估，CPU）：baseline 3,587，grok-4.5 一小时内到 37,329，grok-4.6 到 24,614。
+见 <a href="/pi-rsi/rsi/analysis/grok46-vs-grok45/">grok46-vs-grok45</a>。</li>
+<li>Kaggle House Prices（入门赛，回归，RMSLE 越低越好）：baseline 0.184 → 隐藏 holdout 0.136，公开榜 0.1166，10 个节点 1 小时。
+见 <a href="/pi-rsi/rsi/experiments/hp-grok46/">hp-grok46</a>。</li>
+<li>Kaggle Spaceship Titanic（入门赛，二分类，accuracy）：baseline 0.772 → 隐藏 holdout 0.819，公开榜 0.803（两轮，共 14 个节点，第二轮用 <code>rsi continue</code> 接着跑）。
+见 <a href="/pi-rsi/rsi/experiments/st-grok46/">st-grok46</a>。</li>
+</ul>
+<p>两个 Kaggle 实验的 worker 都是 grok-4.6（xhigh），utility 都是 grok-4.5（low）；最终提交由 harness 在结束时自动完成，一次一个。</p>
+</article><section class="children"><h2>本页下的内容</h2><a href="/pi-rsi/rsi/analysis/"><strong>分析记录</strong><span>跨实验的对比：同一任务包、同一预算下换模型或换 harness 版本。</span></a><a href="/pi-rsi/rsi/experiments/"><strong>实验日志</strong><span>每次 pi-rsi 运行一页：配置、结果、最佳路径、节点表、insights。</span></a></section><footer><div class="friend-label">友情链接</div><div class="friend-links"><a href="https://cats.pocketplay.win/" target="_blank" rel="noopener noreferrer">五只小猫一场戏</a> <a href="https://pocketplay.win/play/sheepdog-meadow/" target="_blank" rel="noopener noreferrer">无能的小狗</a> <a href="https://pocketplay.win/play/lily-hop/" target="_blank" rel="noopener noreferrer">大蛤蟆</a> <a href="https://pocketplay.win/" target="_blank" rel="noopener noreferrer">PocketPlay</a></div></footer></main>
+
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>最初发表于 PocketPlay 博客，现托管在 GitHub Pages。</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grok46-vs-grok45</title>
+<style>
+:root{--bg:#f7f7f5;--fg:#1c1c1c;--muted:#6b6b6b;--panel:#ffffff;--line:#d9d9d4;--accent:#2f6fde;--ok:#2e9e5b;--warn:#d98a1f;--bad:#d64545;--gold:#c9a227;--code:#f0f0ec;--s0:#2f6fde;--s1:#d98a1f;--s2:#2e9e5b;--s3:#8a4fd6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}}
+:root[data-theme="dark"]{--bg:#15161a;--fg:#ececec;--muted:#9aa0a6;--panel:#1f2126;--line:#33363d;--code:#26282e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-inline:16px;padding-block:14px;font-variant-numeric:tabular-nums}
+h1{font-size:19px;margin:0 0 2px;text-wrap:balance}.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.runs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.run{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;border-top:4px solid var(--c)}
+.run h2{font-size:15px;margin:0 0 2px}.run .m{color:var(--muted);font-size:12px;margin-bottom:8px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.kpi .v{font-size:17px;font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px;min-width:0}
+.panel h3{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+svg text{font:12px system-ui,sans-serif;fill:var(--fg)}
+.seq{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+ol{margin:0;padding-left:20px}li{margin:3px 0}
+.tag{display:inline-block;min-width:64px;text-align:right;font-weight:600}
+.up{color:var(--ok)}.down{color:var(--warn)}.fail{color:var(--bad)}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}th{color:var(--muted)}
+</style></head><body>
+<h1 id="h"></h1><div class="sub" id="sub"></div>
+<div class="runs" id="runs"></div>
+<div class="panel"><h3>Best so far by finished node</h3><svg id="c" width="100%" height="300"></svg></div>
+<div class="panel"><h3>Node sequences (finish order)</h3><div class="seq" id="seq"></div></div>
+<script src="data.js"></script><script src="compare.js"></script></body></html>

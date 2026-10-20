@@ -1,0 +1,202 @@
+[
+  {
+    "node": "root",
+    "parent": null,
+    "title": "baseline",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572004065863107,
+    "commit": "520728d47beb2849b60ea7530f66b2234987a893",
+    "finished_at": "2026-10-04T09:41:53+00:00"
+  },
+  {
+    "node": "n001",
+    "parent": "root",
+    "title": "Compact service profiles beyond overall rating mean",
+    "status": "failed",
+    "measurement_status": "invalid",
+    "score": null,
+    "commit": "d6335db7c15910d20e7d390b5845af13dc06cd34",
+    "finished_at": "2026-10-04T09:54:54+00:00"
+  },
+  {
+    "node": "n002",
+    "parent": "root",
+    "title": "Matched summary replication with honest artifact compatibility",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572675016680855,
+    "commit": "44a50d708c20e1e2e1af6b13c984bc9638ea2f17",
+    "finished_at": "2026-10-04T10:14:01+00:00"
+  },
+  {
+    "node": "n003",
+    "parent": "n002",
+    "title": "Digital-service segment gates beyond an ungated main effect",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9573126801034795,
+    "commit": "7974f18ac9bfa2046a8f8f3614679e9ecfbbb368",
+    "finished_at": "2026-10-04T10:36:00+00:00"
+  },
+  {
+    "node": "n004",
+    "parent": "n002",
+    "title": "Capacity-conditioned overall-mean ablation at fixed boosting rounds",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572919711976331,
+    "commit": "d7aca89bb74986b507362fbe320590949433795a",
+    "finished_at": "2026-10-04T10:54:54+00:00"
+  },
+  {
+    "node": "n005",
+    "parent": "n003",
+    "title": "Reverse-order digital-gate replication with net-utility control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572758458565709,
+    "commit": "e48b3930da02381a2a5c6110c688e9b040cf04cd",
+    "finished_at": "2026-10-04T11:16:03+00:00"
+  },
+  {
+    "node": "n006",
+    "parent": "n002",
+    "title": "Isolated lower-tail service consistency beyond the overall mean",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572675425024442,
+    "commit": "cfa2f44baead3f04e806e87e10aa867ec1b212d3",
+    "finished_at": "2026-10-04T11:36:38+00:00"
+  },
+  {
+    "node": "n007",
+    "parent": "n004",
+    "title": "Smaller-step boosting with a compensating horizon and short-path control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9571843963907822,
+    "commit": "07966be0e441f167c1a6f6584d21c5a04a2dd6b8",
+    "finished_at": "2026-10-04T13:05:22+00:00"
+  },
+  {
+    "node": "n008",
+    "parent": "n004",
+    "title": "Regularized depth8 with an isolated deeper-capacity control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577204389488716,
+    "commit": "698a0e64ef7dde0b1126dfda610f15beef51f2e1",
+    "finished_at": "2026-10-04T13:27:53+00:00"
+  },
+  {
+    "node": "n009",
+    "parent": "n008",
+    "title": "Fresh shallow full-pool control for the depth8 signal",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9572919086585254,
+    "commit": "1d52f783d1c1a2aea53e9e830bc75712135c4144",
+    "finished_at": "2026-10-04T13:46:29+00:00"
+  },
+  {
+    "node": "n010",
+    "parent": "n008",
+    "title": "Missing full-pool depth8 control without stronger L2",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9576178234932671,
+    "commit": "5706cbfc7733c45f81428432beab1f294c8d4496",
+    "finished_at": "2026-10-04T14:07:33+00:00"
+  },
+  {
+    "node": "n011",
+    "parent": "n008",
+    "title": "Dual ordinal/categorical ratings with replacement control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577967296706902,
+    "commit": "ba5fef1b08d2e35ef9036cf3f68579590bbce7e1",
+    "finished_at": "2026-10-04T14:34:08+00:00"
+  },
+  {
+    "node": "n012",
+    "parent": "n008",
+    "title": "Fixed restart averaging with an equal-tree continuation control",
+    "status": "failed",
+    "measurement_status": "unavailable",
+    "score": null,
+    "commit": "3d8258edd1b00e7d370418a2e394bd2067dd31ed",
+    "finished_at": "2026-10-04T14:58:12+00:00"
+  },
+  {
+    "node": "n013",
+    "parent": "n008",
+    "title": "Repair-informed restart averaging with preserved component and continuation controls",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577150798991513,
+    "commit": "23e74b8a3eb110c6716bd2b8bdd413fe4d6ac2dd",
+    "finished_at": "2026-10-04T15:21:03+00:00"
+  },
+  {
+    "node": "n014",
+    "parent": "n008",
+    "title": "Designated raw-only full-pool ablation at depth8 capacity",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577845705966306,
+    "commit": "a21a547a1f00388209aa645e64f960dfb0f40f66",
+    "finished_at": "2026-10-04T15:46:56+00:00"
+  },
+  {
+    "node": "n015",
+    "parent": "n014",
+    "title": "Fresh designated mean full-pool control for the raw-versus-mean gap",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577700473603586,
+    "commit": "8aea030a0d5384d7e13b435b19b6cb6efe9c5a41",
+    "finished_at": "2026-10-04T16:07:32+00:00"
+  },
+  {
+    "node": "n016",
+    "parent": "n014",
+    "title": "Designated GPU Depthwise with matched raw SymmetricTree control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9579240131255401,
+    "commit": "ed0b71e78d8fff5194cbcc339946d3a705299718",
+    "finished_at": "2026-10-04T16:32:52+00:00"
+  },
+  {
+    "node": "n017",
+    "parent": "n016",
+    "title": "Fresh designated raw SymmetricTree full-pool policy control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577845705966306,
+    "commit": "0a09da870138362249d869eccad419aabbcea083",
+    "finished_at": "2026-10-04T16:58:45+00:00"
+  },
+  {
+    "node": "n018",
+    "parent": "n017",
+    "title": "Designated raw SymmetricTree depth10 with fixed-round depth8 control",
+    "status": "done",
+    "measurement_status": "validated",
+    "score": 0.9577366851375627,
+    "commit": "e67631c9365d624f36f6e83af68945f3de356302",
+    "finished_at": "2026-10-04T17:25:27+00:00"
+  },
+  {
+    "node": "n019",
+    "parent": "n017",
+    "title": "Systematic travel-conditioned rating equality with ungated-view ablation",
+    "status": "evaluating",
+    "measurement_status": "unavailable",
+    "score": null,
+    "commit": "f9524ca5e5a980459e9c52e4431e8b30a48dd768",
+    "finished_at": null
+  }
+]
