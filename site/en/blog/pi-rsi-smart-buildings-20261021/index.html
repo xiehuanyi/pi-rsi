@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" data-pp-site="blog">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pi-rsi on Smart Buildings: 28 nodes of HVAC control, −66% loss, and where rules run out · pi-rsi</title>
+<meta name="description" content="Two tranches of automated research on the NeurIPS 2026 Smart Buildings competition: how the search cut the baseline loss by two thirds, which two ideas did most of it, and why the rule-based family then saturated.">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/en/blog/pi-rsi-smart-buildings-20261021/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/kit/v2/pp.css">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/blog.css">
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/viz.css?v=fdb7e500c7">
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/d3.min.js?v=6d64bd2f09" defer></script>
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/data.js?v=cb3e1a1252" defer></script>
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/app.js?v=99fcbcb727" defer></script>
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="pp pp-v2">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/">pi-rsi</a><span class="rsi-links"><a href="/pi-rsi/zh/blog/pi-rsi-smart-buildings-20261021/" hreflang="zh">中文</a><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main" class="pp-main"><div class="pp-container bg-wrap"><div class="bg-layout"><article class="bg-main"><header class="bg-header"><h1 class="pp-title bg-title">pi-rsi on Smart Buildings: 28 nodes of HVAC control, −66% loss, and where rules run out</h1><div class="bg-meta"><span>2026-10-22</span><span>Huanyi Xie</span><span>7 min read</span></div><p class="pp-lede">Two tranches of automated research on the NeurIPS 2026 Smart Buildings competition: how the search cut the baseline loss by two thirds, which two ideas did most of it, and why the rule-based family then saturated.</p></header>
+<div class="pp-prose bg-prose">
+<p>pi-rsi is our automated research harness: a research lead proposes the next experiment, a worker implements it in its own Git worktree, and the harness scores the result with a frozen evaluator. This note covers a 28-node run on the Kaggle community competition <a href="https://www.kaggle.com/competitions/neurips-2026-smart-buildings" rel="noopener">NeurIPS 2026 Smart Buildings</a>: one control policy that must run the HVAC of commercial buildings it has never seen, under weather it has never seen, trading occupant comfort against energy cost and carbon. The policy code in every node was written by the agents; our part was the task pack, the evaluation protocol, the audits and a few steering notes.</p>
+<h2>The task and the benchmark</h2>
+<p>Every five simulated minutes the policy reads a building&#x27;s sensors and sets supply-air temperature, static pressure, recirculation, hot-water temperature and, per zone, a damper and a reheat valve. The simulator charges <code>0.6·comfort regret + 0.2·energy + 0.2·carbon</code> per step; an episode is 30 days. Kaggle scores about 48 hidden scenarios. Our local official level is 36 held-out scenarios: six buildings we generated from the organizers&#x27; procedural generator (seeds the workers are forbidden to touch) times six 30-day weather strips that no shipped training scenario uses, one of them from a station absent from all training data. A second sealed set of 36 was kept for the end. The simulator is deterministic, so the baseline scored 0.051699 three times in a row; the per-scenario cap and the worker concurrency were set from a measured throughput curve, because the simulator is memory-bound and 40 parallel episodes run three times slower each than one.</p>
+<h2>What happened</h2>
+<p>The baseline is the organizers&#x27; strongest reference controller. GPT-6.1 Sol was the research lead and the worker; GPT-6 Luna structured decisions and maintained the research wiki. The first tranche of 12 nodes took the score from 0.0517 to 0.0201 in eleven hours; a second tranche of 16 nodes, steered toward cold-climate heating, reached 0.0175 in another seventeen.</p>
+<figure class="sb-fig" id="score-chart">
+<figcaption><strong>Official score by node</strong>, in finish order, lower is better. The dashed line is the best so far; vertical lines mark the start of tranche 2 and the two steering notes. Scores are the local official validation on 36 held-out scenarios, reused across the search, not leaderboard results. Hover or tap a point for the node&#x27;s summary and, where it exists, its sealed-final score.</figcaption>
+<ul class="sb-legend"><li><span class="sb-sw sb-c-best"></span>new best</li><li><span class="sb-sw sb-c-chg"></span>changed, no gain</li><li><span class="sb-sw sb-c-same"></span>output identical to parent</li><li><span class="sb-sw sb-c-fail"></span>failed</li></ul>
+<div class="sb-scroll"><div id="sb-chart"></div></div>
+</figure>
+<h2>Where the gains came from</h2>
+<p>Eight of the 27 measured nodes improved on their parent by more than the practical threshold. Two of them did most of the work:</p>
+<ul>
+<li><strong>n001, per-zone PI with demand coordination</strong> (0.0517 → 0.0370). The reference controller runs a proportional loop on the average zone of each air handler and opens a damper fully at 2 K of error, so occupied zones oscillate through the comfort band. One signed demand per zone, with anti-windup, drives damper and reheat together. Comfort regret fell from 0.052 to 0.009 per step, but gas rose 58% and electricity 40%: comfort was bought with air.</li>
+<li><strong>n004, heat first, airflow second</strong> (0.0370 → 0.0232). Open the reheat valve before adding airflow, and reset the hot-water temperature from how open the valves actually are. Same comfort as n001, gas back at the baseline level, electricity 20% below it. The two cold stations improved by 35–45%.</li>
+</ul>
+<p>The rest of the best path is smaller: a static-pressure allocator (n006, −11%), a cooling supply-air reset coordinated with the economizer (n009, −3%), then in tranche 2 a cap on heating airflow at what the coil can actually warm (n013), an allocator that spends airflow where it delivers net heat (n015), an optimum-start timed from the measured morning response (n016), their merge (n018, −0.0030 against n006) and a consolidation (n021). After n021, eight more heating variants in a row measured within 0.0002 of each other.</p>
+<figure class="sb-fig" id="search-tree">
+<figcaption><strong>Search tree.</strong> Blue edges lead to the best node, n027 (star). Diamonds are nodes whose delivered policy was identical to the parent&#x27;s: the worker built a component, measured no development gain, and shipped it switched off. Node titles and summaries are condensed from the run records.</figcaption>
+<ul class="sb-legend"><li><span class="sb-sw sb-c-best"></span>new best</li><li><span class="sb-sw sb-c-chg"></span>changed, no gain</li><li><span class="sb-sw sb-c-same"></span>output identical to parent</li><li><span class="sb-sw sb-c-fail"></span>failed</li></ul>
+<div class="sb-scroll"><div id="sb-tree"></div></div>
+</figure>
+<h2>Why the rules ran out</h2>
+<p>By n021 the remaining loss had changed character. Split by station, the three warm climates (Atlanta, Phoenix, Singapore) cost 0.005–0.010 each and are electricity-dominated; the three cold ones (Denver, Fairbanks, Minneapolis) cost 0.021–0.038 and are 79% of the total. Inside the cold stations, 61% of the loss is carbon from gas, 25% energy and only 13% comfort. The gas is largely the ventilation floor: the simulator forces at least 30% outside air whenever a handler runs, and at −30 °C that air has to be heated. The two levers we had not yet tried, a valve-feedback hot-water reset and maximum recirculation while heating, were already implicit in the lineage and measured a change of 4·10<sup>−6</sup> (n025). An ablation node (n026) then rebuilt the best controller with every dead layer removed and showed, with a heat ledger, that delivered heat equals intended heat and billed gas exceeds it: the gains are not an accounting artefact.</p>
+<h2>Transfer</h2>
+<p>On the sealed second set the baseline scores 0.0377, the tranche-1 best 0.0123 and the tranche-2 best 0.0111: a 71% reduction against 66% on the search set, and the same ordering. The sealed strips are much milder for Fairbanks and Denver than the search strips (0.004 versus 0.025 for the same controller), which is the reminder that absolute local numbers are a property of the scenario sample. The hidden Kaggle set is another sample, apparently with stations we never trained on; the public leaderboard&#x27;s top is 0.0060 and the last prize place is 0.0083. A submission of the best node is pending.</p>
+<h2>What the harness got wrong, and what we fixed</h2>
+<ul>
+<li>Two official evaluations overlapped at 36 processes each on a 52-core box; seven scenarios hit the per-scenario cap and one node was lost. The daemon now inherits a worker count from the orchestrator&#x27;s environment, and the cap was raised.</li>
+<li>Editing a timeout in the experiment config while evaluations were in flight changed the evaluation identity, so a restart could not re-attach to the live jobs and failed both. Operational fields are now excluded from the identity and a legacy record with a live job is re-attached instead of replaced.</li>
+<li>The planner kept branching new ideas from n006 instead of the current best; a one-paragraph note in the human file was enough to make it merge n015 and n016 (n018) and later run the ablation (n026).</li>
+</ul>
+<p>Cost: 28 h 28 min of wall clock, about $34 of model calls, of which $22 for the workers.</p>
+<h2>Explore</h2>
+<p>The <a href="/pi-rsi/rsi/interactive/smart-buildings-20261021/summary.json" rel="noopener">snapshot data</a> behind the charts and the <a href="/pi-rsi/rsi/interactive/smart-buildings-20261021/en/tree/">full search tree</a> (every node&#x27;s hypothesis, implementation notes, result analysis and metrics) are published with this note. The task pack and evaluator are described in the <a href="https://github.com/xiehuanyi/pi-rsi" rel="noopener">repository</a>.</p>
+</div>
+<section class="bg-sources"><h2>Sources &amp; checks</h2><div class="pp-list">
+<a class="pp-listrow" href="https://www.kaggle.com/competitions/neurips-2026-smart-buildings" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Kaggle competition: NeurIPS 2026 Smart Buildings</h3><p><span>kaggle.com</span><span>Checked 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="https://github.com/smart-buildings-2026/starter-kit" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Organizers&#x27; simulator and reference controllers (starter kit)</h3><p><span>github.com</span><span>Checked 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/summary.json" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Smart Buildings snapshot data (per node, by station, sealed final)</h3><p><span>xiehuanyi.github.io</span><span>Checked 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/en/tree/"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Full search tree explorer for this run</h3><p><span>xiehuanyi.github.io</span><span>Rendered 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+</div></section>
+</article></div></div></main>
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>pi-rsi research notes · hosted on GitHub Pages</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>

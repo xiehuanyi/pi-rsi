@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN" data-pp-site="blog">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pi-rsi 在 Smart Buildings：28 个节点的 HVAC 控制，损失降 66%，以及规则的尽头 · pi-rsi</title>
+<meta name="description" content="在 NeurIPS 2026 Smart Buildings 比赛上的两轮自动研究：搜索如何把基线损失砍掉三分之二，哪两个想法贡献了大头，以及规则型控制器为什么随后饱和。">
+<link rel="canonical" href="https://xiehuanyi.github.io/pi-rsi/zh/blog/pi-rsi-smart-buildings-20261021/">
+<link rel="icon" href="/pi-rsi/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/pi-rsi/assets/kit/v2/pp.css">
+<link rel="stylesheet" href="/pi-rsi/assets/platform/blog.css">
+<link rel="stylesheet" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/viz.css?v=fdb7e500c7">
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/d3.min.js?v=6d64bd2f09" defer></script>
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/data.js?v=cb3e1a1252" defer></script>
+<script src="/pi-rsi/rsi/interactive/smart-buildings-20261021/assets/app.js?v=99fcbcb727" defer></script>
+<link rel="stylesheet" href="/pi-rsi/assets/site.css">
+</head>
+<body class="pp pp-v2">
+<div class="rsi-bar" role="banner"><a class="rsi-home" href="/pi-rsi/zh/">pi-rsi</a><span class="rsi-links"><a href="/pi-rsi/en/blog/pi-rsi-smart-buildings-20261021/" hreflang="en">English</a><a href="https://github.com/xiehuanyi/pi-rsi">GitHub</a></span></div>
+<main id="main" class="pp-main"><div class="pp-container bg-wrap"><div class="bg-layout"><article class="bg-main"><header class="bg-header"><h1 class="pp-title bg-title">pi-rsi 在 Smart Buildings：28 个节点的 HVAC 控制，损失降 66%，以及规则的尽头</h1><div class="bg-meta"><span>2026-10-22</span><span>Huanyi Xie</span><span>7 分钟阅读</span></div><p class="pp-lede">在 NeurIPS 2026 Smart Buildings 比赛上的两轮自动研究：搜索如何把基线损失砍掉三分之二，哪两个想法贡献了大头，以及规则型控制器为什么随后饱和。</p></header>
+<div class="pp-prose bg-prose">
+<p>pi-rsi 是我们的自动研究框架：研究主管提出下一个实验，worker 在自己的 Git worktree 里实现，框架用冻结的评估器打分。这篇笔记记录在 Kaggle 社区赛 <a href="https://www.kaggle.com/competitions/neurips-2026-smart-buildings" rel="noopener">NeurIPS 2026 Smart Buildings</a> 上跑的 28 个节点：一个控制策略，要在从没见过的商业建筑、从没见过的天气下运行 HVAC，在住户舒适度、能耗和碳排之间做权衡。每个节点的策略代码都是 agent 写的；我们做的是任务包、评估协议、审计和几条导向备注。</p>
+<h2>任务与基准</h2>
+<p>每五个仿真分钟，策略读取一栋建筑的传感器，设定送风温度、静压、回风比、热水温度，以及每个区域的风门和再热阀。仿真器每步收取 <code>0.6·舒适度损失 + 0.2·能耗 + 0.2·碳排</code>；一个 episode 是 30 天。Kaggle 在约 48 个隐藏场景上打分。我们本地的官方级别是 36 个留出场景：用主办方的程序化生成器生成的六栋建筑（worker 被禁止触碰这些种子）乘以六条训练场景从未用过的 30 天天气带，其中一条来自训练数据里完全没有的站点。另外 36 个密封场景留到最后。仿真器是确定性的，基线连续三次都得 0.051699；每场景时间上限和 worker 并发数来自实测的吞吐曲线，因为仿真器受内存带宽限制，40 个 episode 并行时每个都比单跑慢三倍。</p>
+<h2>发生了什么</h2>
+<p>基线是主办方最强的参考控制器。GPT-6.1 Sol 担任研究主管和 worker，GPT-6 Luna 结构化决策并维护研究 Wiki。第一轮 12 个节点用十一小时把分数从 0.0517 带到 0.0201；第二轮 16 个节点被导向冷气候供暖，再用十七小时到 0.0175。</p>
+<figure class="sb-fig" id="score-chart">
+<figcaption><strong>按完成顺序排列的各节点官方分数</strong>，越低越好。虚线是截至当时的最佳；竖线标出第二轮的开始和两条导向备注。分数是 36 个留出场景上的本地官方验证分，在整个搜索中反复使用，不是排行榜结果。悬停或点击一个点可看该节点的摘要，以及（如果有）它在密封 final 上的分数。</figcaption>
+<ul class="sb-legend"><li><span class="sb-sw sb-c-best"></span>新最佳</li><li><span class="sb-sw sb-c-chg"></span>有变化但未提升</li><li><span class="sb-sw sb-c-same"></span>输出与父节点相同</li><li><span class="sb-sw sb-c-fail"></span>失败</li></ul>
+<div class="sb-scroll"><div id="sb-chart"></div></div>
+</figure>
+<h2>增益从哪里来</h2>
+<p>27 个有分数的节点里，8 个相对父节点的改进超过了实用阈值。其中两个做了大部分工作：</p>
+<ul>
+<li><strong>n001，带需求协调的逐区 PI</strong>（0.0517 → 0.0370）。参考控制器对每台风柜的区域平均温度做比例控制，误差 2 K 就把风门全开，于是有人的区域在舒适带里来回振荡。改成每个区域一个带符号的需求量，带抗饱和，同时驱动风门和再热阀。舒适度损失从每步 0.052 降到 0.009，但燃气多烧 58%、电多用 40%：舒适度是用风量买来的。</li>
+<li><strong>n004，先热水后风量</strong>（0.0370 → 0.0232）。先开再热阀再加风量，热水温度按阀门实际开度重置。舒适度与 n001 相同，燃气回到基线水平，电耗比基线低 20%。两个冷站点改善 35% 到 45%。</li>
+</ul>
+<p>最佳路径的其余部分较小：静压分配器（n006，−11%）、与经济器协调的制冷送风温度重置（n009，−3%）；第二轮里把供暖风量限制在盘管实际能加热的范围（n013）、把风量花在能交付净热量的地方（n015）、按实测早晨响应确定最优启动时刻（n016）、三者合并（n018，相对 n006 −0.0030）和整合（n021）。n021 之后，连续八个供暖变体的分数彼此相差不到 0.0002。</p>
+<figure class="sb-fig" id="search-tree">
+<figcaption><strong>搜索树。</strong>蓝色边通向最佳节点 n027（星号）。菱形是交付策略与父节点完全相同的节点：worker 做了一个组件，开发集上测不到增益，于是关掉交付。节点标题和摘要由运行记录压缩而来。</figcaption>
+<ul class="sb-legend"><li><span class="sb-sw sb-c-best"></span>新最佳</li><li><span class="sb-sw sb-c-chg"></span>有变化但未提升</li><li><span class="sb-sw sb-c-same"></span>输出与父节点相同</li><li><span class="sb-sw sb-c-fail"></span>失败</li></ul>
+<div class="sb-scroll"><div id="sb-tree"></div></div>
+</figure>
+<h2>规则为什么到头了</h2>
+<p>到 n021 时，剩余损失的性质变了。按站点拆开：三个暖站（Atlanta、Phoenix、Singapore）各 0.005 到 0.010，以电为主；三个冷站（Denver、Fairbanks、Minneapolis）各 0.021 到 0.038，占总量 79%。冷站内部，61% 的损失是燃气带来的碳排，25% 是能耗，舒适度只占 13%。这些燃气主要是通风下限：风柜只要运行，仿真器就强制至少 30% 新风，零下 30 度时这些空气必须被加热。我们尚未试过的两个杠杆——阀位反馈的热水重置和供暖时的最大回风——其实早已隐含在谱系里，实测变化 4·10<sup>−6</sup>（n025）。随后一个消融节点（n026）把最佳控制器去掉所有死层重建，并用热量账本证明实际供热等于意图供热、计费燃气高于供热：增益不是记账产物。</p>
+<h2>迁移</h2>
+<p>在密封的第二套场景上，基线 0.0377，第一轮最佳 0.0123，第二轮最佳 0.0111：相对基线降 71%，搜索集上是 66%，排序一致。密封天气带对 Fairbanks 和 Denver 比搜索天气带温和得多（同一个控制器 0.004 对 0.025），这提醒我们本地的绝对数字是场景样本的属性。Kaggle 的隐藏集是另一个样本，看起来还含有我们从未训练过的站点；公榜榜首 0.0060，最后一个奖金名次 0.0083。最佳节点的提交待进行。</p>
+<h2>框架哪里出了错，以及我们改了什么</h2>
+<ul>
+<li>两次官方评测在一台 52 核机器上各开 36 个进程同时跑，七个场景撞上每场景时间上限，丢了一个节点。现在守护进程从 orchestrator 的环境继承 worker 数，上限也调高了。</li>
+<li>评测进行中改了实验配置里的一个超时字段，评测身份随之改变，重启后无法重新挂接到存活的作业，两个节点都判失败。现在运维字段不参与身份，带存活作业的旧记录会被重新挂接而不是替换。</li>
+<li>规划器一直从 n006 分支新想法而不是从当前最佳；人类备注文件里的一段话就足以让它合并 n015 和 n016（n018），并在后面做消融（n026）。</li>
+</ul>
+<p>开销：墙钟 28 小时 28 分，模型调用约 34 美元，其中 worker 22 美元。</p>
+<h2>查看细节</h2>
+<p>图表背后的<a href="/pi-rsi/rsi/interactive/smart-buildings-20261021/summary.json" rel="noopener">快照数据</a>和<a href="/pi-rsi/rsi/interactive/smart-buildings-20261021/en/tree/">完整搜索树</a>（每个节点的假设、实现笔记、结果分析和指标）随本文发布。任务包和评估器见<a href="https://github.com/xiehuanyi/pi-rsi" rel="noopener">仓库</a>。</p>
+</div>
+<section class="bg-sources"><h2>来源与核验</h2><div class="pp-list">
+<a class="pp-listrow" href="https://www.kaggle.com/competitions/neurips-2026-smart-buildings" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Kaggle competition: NeurIPS 2026 Smart Buildings</h3><p><span>kaggle.com</span><span>核验于 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="https://github.com/smart-buildings-2026/starter-kit" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>主办方的仿真器与参考控制器（starter kit）</h3><p><span>github.com</span><span>核验于 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/summary.json" rel="noopener"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>Smart Buildings 快照数据（按节点、按站点、密封 final）</h3><p><span>xiehuanyi.github.io</span><span>核验于 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+<a class="pp-listrow" href="/pi-rsi/rsi/interactive/smart-buildings-20261021/en/tree/"><span class="pp-glyph pp-glyph--xs pp-glyph--soft" aria-hidden="true"><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-link"/></svg></span><div><h3>本次运行的完整搜索树浏览器</h3><p><span>xiehuanyi.github.io</span><span>渲染于 2026-10-22</span></p></div><svg class="pp-i" aria-hidden="true"><use href="/pi-rsi/assets/kit/v2/icons.svg#i-external-link"/></svg></a>
+</div></section>
+</article></div></div></main>
+<div class="rsi-bar rsi-foot" role="contentinfo"><span>pi-rsi 研究笔记 · 托管于 GitHub Pages</span><a href="https://github.com/xiehuanyi/pi-rsi">github.com/xiehuanyi/pi-rsi</a></div>
+</body>
+</html>
