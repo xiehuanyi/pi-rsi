@@ -41,11 +41,40 @@ class TaskMonitor:
         except FileNotFoundError:
             return attempt, None
 
+    # Task fields that are operational knobs, not part of what an evaluation measures: changing them between a
+    # submission and a controller restart must re-attach to the live job, not collide with it.
+    OPERATIONAL_TASK_FIELDS = ("job_timeout_s", "eval_timeout_s", "job_stall_s", "job_resumable", "job_early_stop",
+                               "final_top_k", "reference_scores", "docs", "brief", "final_eval_root")
+
+    @classmethod
+    def essential(cls, identity):
+        """The identity with operational task fields removed (what makes two submissions the same evaluation)."""
+        if not isinstance(identity, dict):
+            return identity
+        out = dict(identity)
+        task = out.get("task")
+        if isinstance(task, dict):
+            out["task"] = {k: v for k, v in task.items() if k not in cls.OPERATIONAL_TASK_FIELDS}
+        return out
+
     def submit(self, cmd, cwd, *, identity, attempt=0, aliases=None, **options):
         fingerprint = self.fingerprint(identity)
         aliases = aliases or {}
         record = read_json(self.path, {}) or {}
         same = record.get("identity") == fingerprint or record.get("identity") in aliases
+        if not same and record.get("job"):
+            stored = record.get("identity_full")
+            if stored is None or self.essential(stored) == self.essential(identity):
+                # Same evaluation slot and nothing that matters changed (or a legacy record that kept no
+                # identity details): a live or finished job here is this evaluation; never duplicate it.
+                try:
+                    live = jobs.Job.load(record["job"])
+                except FileNotFoundError:
+                    live = None
+                if live is not None and live.status in ("queued", "running", "done"):
+                    same = True
+                    self.save(identity=fingerprint, identity_full=identity, attempt=record.get("attempt", attempt))
+                    record = read_json(self.path, {}) or {}
         if same and record.get("job"):
             try:
                 job = jobs.Job.load(record["job"])
@@ -80,8 +109,9 @@ class TaskMonitor:
                 archive = archive.with_name(archive.name + "." + hashlib.sha256(result.read_bytes()).hexdigest()[:12])
             result.replace(archive)
         job = jobs.submit(cmd, cwd, **options)
-        atomic_write_json(self.path, {"identity": fingerprint, "job": job.id, "attempt": attempt, "state": "queued",
-            "created_at": now_iso(), "attempts": history, "wake_count": 0, "wake_ready": False})
+        atomic_write_json(self.path, {"identity": fingerprint, "identity_full": identity, "job": job.id,
+            "attempt": attempt, "state": "queued", "created_at": now_iso(), "attempts": history,
+            "wake_count": 0, "wake_ready": False})
         return job
 
     def attempt(self, default=0):

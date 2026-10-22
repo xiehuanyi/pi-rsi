@@ -954,6 +954,7 @@ def _mechanical_path(parent_path, own, limit):
 
 
 def _path_prompt(parent_path, own, limit):
+    parent_text = parent_path.strip() or "(this node's parent is the root baseline)"
     return f"""You maintain pi-rsi's path summaries: the working memory a node's children receive about their ancestors.
 Return JSON only: {{"path": "<markdown, at most {limit} characters>"}}.
 Compress the PARENT PATH and THIS NODE into one path summary from the root to this node: one short entry per
@@ -962,7 +963,7 @@ Keep official numbers exactly as given; drop detail before dropping an ancestor;
 inputs do not contain. Node IDs are citations: keep every one of them.
 PARENT PATH
 <<<
-{parent_path.strip() or '(this node\'s parent is the root baseline)'}
+{parent_text}
 >>>
 THIS NODE
 <<<
